@@ -6,6 +6,11 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		DAAED2892D85E6830038C342 /* GLTFKit2 in Frameworks */ = {isa = PBXBuildFile; productRef = DAAED2882D85E6830038C342 /* GLTFKit2 */; };
+		DAD68EC62D877E8A00D36881 /* Yams in Frameworks */ = {isa = PBXBuildFile; productRef = DAD68EC52D877E8A00D36881 /* Yams */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		DAAED25A2D8136C90038C342 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -52,6 +57,8 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				DAD68EC62D877E8A00D36881 /* Yams in Frameworks */,
+				DAAED2892D85E6830038C342 /* GLTFKit2 in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -78,6 +85,7 @@
 				DAAED24A2D8136C70038C342 /* SwiftMetalRenderer */,
 				DAAED25C2D8136C90038C342 /* SwiftMetalRendererTests */,
 				DAAED2662D8136C90038C342 /* SwiftMetalRendererUITests */,
+				DAD68EC42D877E8A00D36881 /* Frameworks */,
 				DAAED2492D8136C70038C342 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -90,6 +98,13 @@
 				DAAED2632D8136C90038C342 /* SwiftMetalRendererUITests.xctest */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		DAD68EC42D877E8A00D36881 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			name = Frameworks;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -112,6 +127,8 @@
 			);
 			name = SwiftMetalRenderer;
 			packageProductDependencies = (
+				DAAED2882D85E6830038C342 /* GLTFKit2 */,
+				DAD68EC52D877E8A00D36881 /* Yams */,
 			);
 			productName = SwiftMetalRenderer;
 			productReference = DAAED2482D8136C70038C342 /* SwiftMetalRenderer.app */;
@@ -195,6 +212,10 @@
 			);
 			mainGroup = DAAED23F2D8136C70038C342;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				DAAED2872D85E6830038C342 /* XCRemoteSwiftPackageReference "GLTFKit2" */,
+				DAD68EC02D873F5500D36881 /* XCRemoteSwiftPackageReference "Yams" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = DAAED2492D8136C70038C342 /* Products */;
 			projectDirPath = "";
@@ -549,6 +570,38 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		DAAED2872D85E6830038C342 /* XCRemoteSwiftPackageReference "GLTFKit2" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/warrenm/GLTFKit2.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 0.5.12;
+			};
+		};
+		DAD68EC02D873F5500D36881 /* XCRemoteSwiftPackageReference "Yams" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/jpsim/Yams.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 5.3.1;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		DAAED2882D85E6830038C342 /* GLTFKit2 */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = DAAED2872D85E6830038C342 /* XCRemoteSwiftPackageReference "GLTFKit2" */;
+			productName = GLTFKit2;
+		};
+		DAD68EC52D877E8A00D36881 /* Yams */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = DAD68EC02D873F5500D36881 /* XCRemoteSwiftPackageReference "Yams" */;
+			productName = Yams;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = DAAED2402D8136C70038C342 /* Project object */;
 }

@@ -14,6 +14,7 @@ class MetalRenderer: NSObject, MTKViewDelegate {
     let pipelineState: MTLRenderPipelineState
     let commandQueue: MTLCommandQueue
     let device: MTLDevice
+    let m_sceneManager: SceneManager
     
     /*
     let vertices: [Vertex] = [
@@ -35,6 +36,7 @@ class MetalRenderer: NSObject, MTKViewDelegate {
     
     override init(){
         device = MetalRenderer.createDevice()
+        m_sceneManager = SceneManager()
         commandQueue = MetalRenderer.createCmdQueue(iDevice: device)
         vertexBuffer = MetalRenderer.createGpuBuffer(iDevice: device,
                                                      bufferData: vertices,
@@ -56,6 +58,9 @@ class MetalRenderer: NSObject, MTKViewDelegate {
         pipelineDescriptor.fragmentFunction = fragmentFunction
         pipelineDescriptor.vertexDescriptor = vertexDescriptor
         pipelineState = MetalRenderer.createPipelineState(iDevice: device, descriptor: pipelineDescriptor)
+        
+        let sceneConfigFile = "/Users/jiaruiyan/Projects/SwiftMetalRenderer/SwiftMetalRenderer/scene/CubeScene.yaml"
+        
         
         super.init()
     }

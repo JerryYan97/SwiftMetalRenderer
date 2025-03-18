@@ -15,10 +15,12 @@ struct ContentView: View {
             Spacer()
             MetalView(rotation: $rotation).aspectRatio(1, contentMode: .fit)
             Spacer()
-        }.onChange(of: rotation,
+        }
+        /*
+        .onChange(of: rotation,
                    {
             oldValue, newValue in print("Slider value changed from \(oldValue) to \(newValue).")
-        })
+        })*/
     }
 }
 
