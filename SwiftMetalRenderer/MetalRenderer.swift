@@ -60,7 +60,7 @@ class MetalRenderer: NSObject, MTKViewDelegate {
         pipelineState = MetalRenderer.createPipelineState(iDevice: device, descriptor: pipelineDescriptor)
         
         let sceneConfigFile = "/Users/jiaruiyan/Projects/SwiftMetalRenderer/SwiftMetalRenderer/scene/CubeScene.yaml"
-        
+        m_sceneManager.LoadYamlScene(iSceneFilePath: sceneConfigFile)
         
         super.init()
     }

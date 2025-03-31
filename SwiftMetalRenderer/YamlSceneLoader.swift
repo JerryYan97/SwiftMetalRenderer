@@ -6,6 +6,7 @@
 //
 import Foundation
 import Yams
+import GLTFKit2
 
 enum SceneObjectType {
     case None
@@ -22,6 +23,7 @@ struct YamlSceneObjStruct: Codable {
     var fov: Float?
     var farPlane: Float?
     var nearPlane: Float?
+    var gltfLoadType: String?
 }
 
 struct YamlSceneInfoStruct: Codable{
@@ -41,6 +43,12 @@ class SceneNode
     }
 }
 
+struct AggregateCPUGPUBuffer
+{
+    
+    
+}
+
 class StaticModel : SceneNode {
     
 }
@@ -57,16 +65,129 @@ struct YamlSceneLoader {
     
 }
 
+func GetAComponentEleBytesCnt(componentType : GLTFComponentType) -> Int {
+    var bytesCnt : Int = 0
+    
+    switch componentType {
+    case .float:
+        bytesCnt = 4
+    case .unsignedInt:
+        bytesCnt = 4
+    case .unsignedShort:
+        bytesCnt = 2
+    case .short:
+        bytesCnt = 2
+    case .unsignedByte:
+        bytesCnt = 1
+    case .byte:
+        bytesCnt = 1
+    default:
+        assert(false)
+    }
+    
+    return bytesCnt
+}
+
+func GetComponentEleCnt(valDimension : GLTFValueDimension) -> Int {
+    var componentDim : Int = 0
+    
+    switch valDimension {
+    case .scalar:
+        componentDim = 1
+    case .vector2:
+        componentDim = 2
+    case .vector3:
+        componentDim = 3
+    case .vector4:
+        componentDim = 4
+    case .matrix2:
+        componentDim = 4
+    case .matrix3:
+        componentDim = 9
+    case .matrix4:
+        componentDim = 16
+    default:
+        assert(false)
+    }
+    
+    return componentDim
+}
+
 class SceneManager
 {
     var m_curSceneInfo: YamlSceneInfoStruct
     
     let m_sceneGraph: SceneGraph
-    
+    var m_asset: GLTFAsset? {
+        didSet{
+            if m_asset != nil {
+                // Parsing the gltf asset
+                print("Intercept m_asset")
+                let assetRef = m_asset!
+                for meshIdx in 0..<assetRef.meshes.count {
+                    let meshRef = assetRef.meshes[meshIdx]
+                    // Currently only support a single mesh:
+                    for primitiveIdx in 0..<meshRef.primitives.count {
+                        let prim = meshRef.primitives[primitiveIdx]
+                        let posAttribute = prim.attribute(forName: "POSITION")
+                        assert(posAttribute != nil, "A primitive must have a POSITION attribute")
+                        assert(posAttribute!.accessor.componentType == .float, "POSITION attribute must be float components")
+                        assert(posAttribute!.accessor.dimension == .vector3, "POSITION attribute must be 3D vector")
+                        /// Load Position
+                        let pPosData = ReadOutAccessorData(iAccessor: posAttribute!.accessor)
+                        
+                        pPosData.withMemoryRebound(to: Float.self) { (ptr: UnsafeMutableBufferPointer<Float>) in
+                            let cnt = ptr.count
+                            for eleIdx in 0..<(cnt / 3) {
+                                print("Pos<", ptr[eleIdx * 3], ",", ptr[eleIdx * 3 + 1], ",", ptr[eleIdx * 3 + 2], ">")
+                            }
+                        }
+                        
+                        
+                        print("Interception")
+                        ///
+                        
+                        /// Load Normal
+                        
+                        ///
+                        
+                        
+                    }
+                }
+            }
+        }
+    }
     
     init(){
         m_sceneGraph = SceneGraph(m_nodes: [:])
         m_curSceneInfo = YamlSceneInfoStruct(sceneName: "", version: nil, sceneObjs: nil)
+    }
+    
+    func ReadOutAccessorData(iAccessor: GLTFAccessor) -> UnsafeMutableRawBufferPointer{
+        let bufferView = iAccessor.bufferView!
+        let buffer = bufferView.buffer
+        
+        /// Calculate data bytes count for copying out
+        let componentBytesCnt = GetAComponentEleBytesCnt(componentType: iAccessor.componentType)
+        let dimCnt = GetComponentEleCnt(valDimension: iAccessor.dimension)
+        let componentCount = iAccessor.count
+        let elementBytesCnt = dimCnt * componentBytesCnt
+        let dataBytesCnt = componentBytesCnt * dimCnt * componentCount
+        
+        let pData: UnsafeMutableRawBufferPointer = UnsafeMutableRawBufferPointer.allocate(byteCount: dataBytesCnt, alignment: 1024)
+        
+        if bufferView.stride == elementBytesCnt {
+            buffer.data?.copyBytes(to: pData, from: bufferView.offset...(dataBytesCnt + bufferView.offset))
+        }else {
+            for i in 0..<componentCount {
+                let srcByteOffset = bufferView.offset + i * bufferView.stride
+                let dstByteOffset = i * elementBytesCnt
+                let dstPtr = UnsafeMutableRawBufferPointer.init(start: (pData.baseAddress! + dstByteOffset), count: elementBytesCnt)
+                buffer.data?.copyBytes(to: dstPtr, from: srcByteOffset..<(srcByteOffset + elementBytesCnt))
+            }
+        }
+        
+        return pData
     }
     
     func LoadYamlScene(iSceneFilePath: String) -> Bool {
@@ -78,8 +199,25 @@ class SceneManager
             do {
                 m_curSceneInfo = try decoder.decode(YamlSceneInfoStruct.self, from: text!)
                 
+                let assetDir = "/Users/jiaruiyan/Projects/SwiftMetalRenderer/SwiftMetalRenderer/assets"
+                
                 let sceneObjs = m_curSceneInfo.sceneObjs!
                 for(name, sceneObj) in sceneObjs {
+                    print("Name: \(name), Type: \(sceneObj.objType)")
+                    
+                    if sceneObj.modelPath != nil {
+                        let modelPath = assetDir + "/" + sceneObj.modelPath!
+                        let gltfModelUrl = URL(fileURLWithPath: modelPath)
+                        GLTFAsset.load(with: gltfModelUrl, options: [:], handler: { (progress, status, maybeAsset, maybeError, _) in
+                            DispatchQueue.main.async{
+                                if status == .complete {
+                                    self.m_asset = maybeAsset
+                                } else if let error = maybeError {
+                                    print("Failed to load glTF asset: \(error)")
+                                }
+                            }
+                        })
+                    }
                     
                 }
             } catch {
