@@ -7,11 +7,18 @@
 import Foundation
 import Yams
 import GLTFKit2
+import MetalKit
 
 enum SceneObjectType {
     case None
     case StaticModel
     case Camera
+}
+
+enum VertexBufferLayout
+{
+    case POSITION_FLOAT3_NORMAL_FLOAT3_TANGENT_FLOAT3_BITANGENT_FLOAT3_TEXCOORD0_FLOAT2
+    case POSITION_FLOAT3_NORMAL_FLOAT3_TEXCOORD0_FLOAT2
 }
 
 struct YamlSceneObjStruct: Codable {
@@ -43,13 +50,16 @@ class SceneNode
     }
 }
 
-struct AggregateCPUGPUBuffer
-{
+struct PrimitiveShape {
+    var m_vertexLayout: VertexBufferLayout
+    var m_vertexData: UnsafeMutableRawBufferPointer
     
-    
+    var m_idxType: Bool // 0: uint16_t, 1: uint32_t
+    var m_idxData: UnsafeMutableRawBufferPointer
 }
 
 class StaticModel : SceneNode {
+    var m_primitiveShapes: [PrimitiveShape] = []
     
 }
 
@@ -135,6 +145,10 @@ class SceneManager
                         assert(posAttribute!.accessor.dimension == .vector3, "POSITION attribute must be 3D vector")
                         /// Load Position
                         let pPosData = ReadOutAccessorData(iAccessor: posAttribute!.accessor)
+                        
+                        /// Load Normal
+                        
+                        
                         
                         pPosData.withMemoryRebound(to: Float.self) { (ptr: UnsafeMutableBufferPointer<Float>) in
                             let cnt = ptr.count
