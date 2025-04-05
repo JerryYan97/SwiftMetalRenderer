@@ -17,9 +17,22 @@ enum SceneObjectType {
 
 enum VertexBufferLayout
 {
-    case POSITION_FLOAT3_NORMAL_FLOAT3_TANGENT_FLOAT3_BITANGENT_FLOAT3_TEXCOORD0_FLOAT2
+    case POSITION_FLOAT3_NORMAL_FLOAT3_TANGENT_FLOAT3_TEXCOORD0_FLOAT2
     case POSITION_FLOAT3_NORMAL_FLOAT3_TEXCOORD0_FLOAT2
+    case POSITION_FLOAT3_NORMAL_FLOAT3
 }
+
+func ChooseVertexBufferLayout(hasTangent: Bool, hasTexCoord: Bool) -> VertexBufferLayout{
+    var res: VertexBufferLayout = .POSITION_FLOAT3_NORMAL_FLOAT3
+    if hasTangent {
+        res = .POSITION_FLOAT3_NORMAL_FLOAT3_TANGENT_FLOAT3_TEXCOORD0_FLOAT2
+    } else {
+        if hasTexCoord {
+            res = .POSITION_FLOAT3_NORMAL_FLOAT3_TEXCOORD0_FLOAT2
+        }
+    }
+}
+
 
 struct YamlSceneObjStruct: Codable {
     var objName: String
@@ -68,7 +81,7 @@ class Camera : SceneNode {
 }
 
 struct SceneGraph {
-    var m_nodes: [String: SceneNode]
+    var m_nodes: [SceneNode]
 }
 
 struct YamlSceneLoader {
@@ -127,7 +140,7 @@ class SceneManager
 {
     var m_curSceneInfo: YamlSceneInfoStruct
     
-    let m_sceneGraph: SceneGraph
+    var m_sceneGraph: SceneGraph
     var m_asset: GLTFAsset? {
         didSet{
             if m_asset != nil {
@@ -136,10 +149,15 @@ class SceneManager
                 let assetRef = m_asset!
                 for meshIdx in 0..<assetRef.meshes.count {
                     let meshRef = assetRef.meshes[meshIdx]
+                    var staticModelNode: StaticModel = StaticModel()
                     // Currently only support a single mesh:
                     for primitiveIdx in 0..<meshRef.primitives.count {
                         let prim = meshRef.primitives[primitiveIdx]
                         let posAttribute = prim.attribute(forName: "POSITION")
+                        let nrmAttribute = prim.attribute(forName: "NORMAL")
+                        let tanAttribute = prim.attribute(forName: "TANGENT")
+                        let uvAttribute = prim.attribute(forName: "TEXCOORD_0")
+                        
                         assert(posAttribute != nil, "A primitive must have a POSITION attribute")
                         assert(posAttribute!.accessor.componentType == .float, "POSITION attribute must be float components")
                         assert(posAttribute!.accessor.dimension == .vector3, "POSITION attribute must be 3D vector")
@@ -147,6 +165,20 @@ class SceneManager
                         let pPosData = ReadOutAccessorData(iAccessor: posAttribute!.accessor)
                         
                         /// Load Normal
+                        let pNormalData = ReadOutAccessorData(iAccessor: nrmAttribute!.accessor)
+                        
+                        /// Load Tangent
+                        var pTangentData : UnsafeMutableRawBufferPointer
+                        if(tanAttribute != nil){
+                            pTangentData = ReadOutAccessorData(iAccessor: tanAttribute!.accessor)
+                        }
+                        
+                        /// Construct the vertex buffer and index buffer
+                        var primShape: PrimitiveShape
+                        primShape.m_vertexLayout = ChooseVertexBufferLayout(hasTangent: tanAttribute != nil,
+                                                                            hasTexCoord: uvAttribute != nil)
+                        
+                        
                         
                         
                         
@@ -159,21 +191,19 @@ class SceneManager
                         
                         
                         print("Interception")
-                        ///
                         
-                        /// Load Normal
-                        
-                        ///
-                        
-                        
+                        staticModelNode.m_primitiveShapes.append(primShape)
                     }
+                    m_sceneGraph.m_nodes.append(staticModelNode)
+                    
+                    
                 }
             }
         }
     }
     
     init(){
-        m_sceneGraph = SceneGraph(m_nodes: [:])
+        m_sceneGraph = SceneGraph(m_nodes: [])
         m_curSceneInfo = YamlSceneInfoStruct(sceneName: "", version: nil, sceneObjs: nil)
     }
     
