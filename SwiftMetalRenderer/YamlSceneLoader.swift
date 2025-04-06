@@ -10,7 +10,6 @@ import GLTFKit2
 import MetalKit
 
 enum SceneObjectType {
-    case None
     case StaticModel
     case Camera
 }
@@ -31,6 +30,8 @@ func ChooseVertexBufferLayout(hasTangent: Bool, hasTexCoord: Bool) -> VertexBuff
             res = .POSITION_FLOAT3_NORMAL_FLOAT3_TEXCOORD0_FLOAT2
         }
     }
+    
+    return res
 }
 
 
@@ -54,21 +55,21 @@ struct YamlSceneInfoStruct: Codable{
 
 class SceneNode
 {
-    let m_objType: SceneObjectType
-    let m_objName: String
+    let m_objType: SceneObjectType?
+    let m_objName: String?
     
-    init(iObjType: SceneObjectType, iObjName: String){
+    init(iObjType: SceneObjectType?, iObjName: String?){
         m_objType = iObjType
         m_objName = iObjName
     }
 }
 
 struct PrimitiveShape {
-    var m_vertexLayout: VertexBufferLayout
-    var m_vertexData: UnsafeMutableRawBufferPointer
+    var m_vertexLayout: VertexBufferLayout?
+    var m_vertexData: UnsafeMutableRawBufferPointer?
     
-    var m_idxType: Bool // 0: uint16_t, 1: uint32_t
-    var m_idxData: UnsafeMutableRawBufferPointer
+    var m_idxType: Bool? // 0: uint16_t, 1: uint32_t
+    var m_idxData: UnsafeMutableRawBufferPointer?
 }
 
 class StaticModel : SceneNode {
@@ -149,9 +150,14 @@ class SceneManager
                 let assetRef = m_asset!
                 for meshIdx in 0..<assetRef.meshes.count {
                     let meshRef = assetRef.meshes[meshIdx]
-                    var staticModelNode: StaticModel = StaticModel()
+                    var staticModelNode: StaticModel = StaticModel(iObjType: Optional.none, iObjName: Optional.none)
                     // Currently only support a single mesh:
                     for primitiveIdx in 0..<meshRef.primitives.count {
+                        
+                        #if DEBUG
+                        print("<YamlSceneLoader>: prim ", primitiveIdx, ":")
+                        #endif
+                        
                         let prim = meshRef.primitives[primitiveIdx]
                         let posAttribute = prim.attribute(forName: "POSITION")
                         let nrmAttribute = prim.attribute(forName: "NORMAL")
@@ -161,6 +167,8 @@ class SceneManager
                         assert(posAttribute != nil, "A primitive must have a POSITION attribute")
                         assert(posAttribute!.accessor.componentType == .float, "POSITION attribute must be float components")
                         assert(posAttribute!.accessor.dimension == .vector3, "POSITION attribute must be 3D vector")
+                        assert(prim.indices != nil, "A primitive must have an index buffer")
+                        
                         /// Load Position
                         let pPosData = ReadOutAccessorData(iAccessor: posAttribute!.accessor)
                         
@@ -168,18 +176,28 @@ class SceneManager
                         let pNormalData = ReadOutAccessorData(iAccessor: nrmAttribute!.accessor)
                         
                         /// Load Tangent
-                        var pTangentData : UnsafeMutableRawBufferPointer
+                        var pTangentData : UnsafeMutableRawBufferPointer?
                         if(tanAttribute != nil){
                             pTangentData = ReadOutAccessorData(iAccessor: tanAttribute!.accessor)
                         }
                         
+                        var pUVData : UnsafeMutableRawBufferPointer?
+                        if(uvAttribute != nil){
+                            pUVData = ReadOutAccessorData(iAccessor: uvAttribute!.accessor)
+                        }
+                        
                         /// Construct the vertex buffer and index buffer
-                        var primShape: PrimitiveShape
-                        primShape.m_vertexLayout = ChooseVertexBufferLayout(hasTangent: tanAttribute != nil,
-                                                                            hasTexCoord: uvAttribute != nil)
-                        
-                        
-                        
+                        var primShape: PrimitiveShape = PrimitiveShape()
+                        let vertLayout = ChooseVertexBufferLayout(hasTangent: tanAttribute != nil,
+                                                                  hasTexCoord: uvAttribute != nil)
+                        primShape.m_vertexLayout = vertLayout
+                        primShape.m_idxData = ReadOutAccessorData(iAccessor: prim.indices!)
+                        primShape.m_idxType = IsIdxTypeUint32(iIdxAccessor: prim.indices!)
+                        primShape.m_vertexData = AssembleVertexBuffer(iPos: pPosData,
+                                                                      iNrm: pNormalData,
+                                                                      iTangent: pTangentData,
+                                                                      iUV: pUVData,
+                                                                      iVertSizeInBytes: VertSizeInByte(iVertLayout: vertLayout))
                         
                         
                         pPosData.withMemoryRebound(to: Float.self) { (ptr: UnsafeMutableBufferPointer<Float>) in
@@ -207,9 +225,113 @@ class SceneManager
         m_curSceneInfo = YamlSceneInfoStruct(sceneName: "", version: nil, sceneObjs: nil)
     }
     
+    func AssembleVertexBuffer(iPos: UnsafeMutableRawBufferPointer,
+                              iNrm: UnsafeMutableRawBufferPointer,
+                              iTangent: UnsafeMutableRawBufferPointer?,
+                              iUV: UnsafeMutableRawBufferPointer?,
+                              iVertSizeInBytes: Int) -> UnsafeMutableRawBufferPointer{
+        let vertCnt = iPos.count / (MemoryLayout<Float>.stride * 3)
+        let bufferSize = vertCnt * iVertSizeInBytes
+        let pVertBuffer: UnsafeMutableRawBufferPointer = UnsafeMutableRawBufferPointer.allocate(byteCount: bufferSize, alignment: 1024)
+        
+        for i in 0..<vertCnt{
+            let startingByteOffset: Int = i * iVertSizeInBytes
+            var curByteOffset: Int = startingByteOffset
+            
+            /// Pos
+            let pPosDst = pVertBuffer.baseAddress?.advanced(by: startingByteOffset)
+            
+            let posSrcOffset = MemoryLayout<Float>.stride * 3 * i
+            let pPosSrc = iPos.baseAddress?.advanced(by: posSrcOffset)
+            pPosDst?.copyMemory(from: pPosSrc!, byteCount: MemoryLayout<Float>.stride * 3)
+            
+#if DEBUG
+            pPosSrc?.withMemoryRebound(to: Float.self, capacity: 3, { (ptr: UnsafeMutablePointer<Float>) in
+                print("<YamlSceneLoader>: pos:<", ptr.pointee, ",", ptr.advanced(by: 1).pointee, ",", ptr.advanced(by: 2).pointee, ">")
+            })
+#endif
+            
+            curByteOffset += (MemoryLayout<Float>.stride * 3)
+            
+            /// Normal
+            let pNormalDst = pVertBuffer.baseAddress?.advanced(by: curByteOffset)
+            
+            let nrmSizeInByte = MemoryLayout<Float>.stride * 3
+            let nrmSrcOffset = nrmSizeInByte * i
+            let pNrmSrc = iNrm.baseAddress?.advanced(by: nrmSrcOffset)
+            pNormalDst?.copyMemory(from: pNrmSrc!, byteCount: nrmSizeInByte)
+            
+#if DEBUG
+            pNormalDst?.withMemoryRebound(to: Float.self, capacity: 3, { (ptr: UnsafeMutablePointer<Float>) in
+                print("<YamlSceneLoader>: Normal:<", ptr.pointee, ",", ptr.advanced(by: 1).pointee, ",", ptr.advanced(by: 2).pointee, ">")
+            })
+#endif
+            
+            curByteOffset += (MemoryLayout<Float>.stride * 3)
+            
+            /// Tangent
+            if iTangent != nil{
+                let pTangentDst = pVertBuffer.baseAddress?.advanced(by: curByteOffset)
+                
+                let tangentSizeInByte = MemoryLayout<Float>.stride * 3
+                let tangentSrcOffset = tangentSizeInByte * i
+                let pTangentSrc = iTangent!.baseAddress?.advanced(by: tangentSrcOffset)
+                
+                pTangentDst?.copyMemory(from: pTangentSrc!, byteCount: tangentSizeInByte)
+                
+#if DEBUG
+                pTangentDst?.withMemoryRebound(to: Float.self, capacity: 3, { (ptr: UnsafeMutablePointer<Float>) in
+                    print("<YamlSceneLoader>: Tangent:<", ptr.pointee, ",", ptr.advanced(by: 1).pointee, ",", ptr.advanced(by: 2).pointee, ">")
+                })
+#endif
+                
+                curByteOffset += (MemoryLayout<Float>.stride * 3)
+            }
+            
+            /// UV
+            if iUV != nil{
+                let pUVDst = pVertBuffer.baseAddress?.advanced(by: curByteOffset)
+                
+                let uvSizeInByte = MemoryLayout<Float>.stride * 2
+                let uvSrcOffset = uvSizeInByte * i
+                let pUVSrc = iUV!.baseAddress?.advanced(by: uvSrcOffset)
+                
+                pUVDst?.copyMemory(from: pUVSrc!, byteCount: uvSizeInByte)
+                
+#if DEBUG
+                pUVDst?.withMemoryRebound(to: Float.self, capacity: 2, { (ptr: UnsafeMutablePointer<Float>) in
+                    print("<YamlSceneLoader>: UV:<", ptr.pointee, ",", ptr.advanced(by: 1).pointee, ">")
+                    
+                })
+#endif
+            }
+        }
+        
+        return pVertBuffer
+    }
+    
+    func VertSizeInByte(iVertLayout: VertexBufferLayout) -> Int{
+        switch iVertLayout{
+        case .POSITION_FLOAT3_NORMAL_FLOAT3:
+            return MemoryLayout<Float>.stride * 6
+        case .POSITION_FLOAT3_NORMAL_FLOAT3_TANGENT_FLOAT3_TEXCOORD0_FLOAT2:
+            return MemoryLayout<Float>.stride * 11
+        case .POSITION_FLOAT3_NORMAL_FLOAT3_TEXCOORD0_FLOAT2:
+            return MemoryLayout<Float>.stride * 8
+        default:
+            assert(false, "Unrecognized vertex layout")
+            return 0
+        }
+    }
+    
+    func IsIdxTypeUint32(iIdxAccessor: GLTFAccessor) -> Bool{
+        return iIdxAccessor.componentType == .unsignedInt
+    }
+    
     func ReadOutAccessorData(iAccessor: GLTFAccessor) -> UnsafeMutableRawBufferPointer{
         let bufferView = iAccessor.bufferView!
         let buffer = bufferView.buffer
+        let bufferOffset = bufferView.offset + iAccessor.offset
         
         /// Calculate data bytes count for copying out
         let componentBytesCnt = GetAComponentEleBytesCnt(componentType: iAccessor.componentType)
@@ -221,10 +343,10 @@ class SceneManager
         let pData: UnsafeMutableRawBufferPointer = UnsafeMutableRawBufferPointer.allocate(byteCount: dataBytesCnt, alignment: 1024)
         
         if bufferView.stride == elementBytesCnt {
-            buffer.data?.copyBytes(to: pData, from: bufferView.offset...(dataBytesCnt + bufferView.offset))
+            buffer.data?.copyBytes(to: pData, from: bufferOffset...(dataBytesCnt + bufferOffset))
         }else {
             for i in 0..<componentCount {
-                let srcByteOffset = bufferView.offset + i * bufferView.stride
+                let srcByteOffset = bufferOffset + i * bufferView.stride
                 let dstByteOffset = i * elementBytesCnt
                 let dstPtr = UnsafeMutableRawBufferPointer.init(start: (pData.baseAddress! + dstByteOffset), count: elementBytesCnt)
                 buffer.data?.copyBytes(to: dstPtr, from: srcByteOffset..<(srcByteOffset + elementBytesCnt))
