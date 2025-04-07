@@ -70,6 +70,11 @@ class MetalRenderer: NSObject, MTKViewDelegate {
     }
     
     func draw(in view: MTKView) {
+        if m_sceneManager.IsAssetReady() {
+            
+        }
+        
+        
         if let drawable = view.currentDrawable,
            let renderPassDescriptor = view.currentRenderPassDescriptor {
             

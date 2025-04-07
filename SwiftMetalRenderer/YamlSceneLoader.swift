@@ -64,21 +64,57 @@ class SceneNode
     }
 }
 
+enum MaterialType
+{
+    case None
+    case Constant
+}
+
+class BaseMaterial
+{
+    let m_materialType: MaterialType
+    
+    init(materialType: MaterialType) {
+        self.m_materialType = materialType
+    }
+}
+
+class ConstantMaterial : BaseMaterial
+{
+    let m_diffuseColor: [Float]
+    
+    init(diffuseColor: [Float]) {
+        self.m_diffuseColor = diffuseColor
+        super.init(materialType: .Constant)
+    }
+}
+
 struct PrimitiveShape {
     var m_vertexLayout: VertexBufferLayout?
     var m_vertexData: UnsafeMutableRawBufferPointer?
     
     var m_idxType: Bool? // 0: uint16_t, 1: uint32_t
     var m_idxData: UnsafeMutableRawBufferPointer?
+    
+    var m_material: BaseMaterial?
+    
+    var m_vertBufferMtl: MTLBuffer?
+    var m_idxBufferMtl: MTLBuffer?
 }
 
 class StaticModel : SceneNode {
     var m_primitiveShapes: [PrimitiveShape] = []
-    
+    var m_worldMatrix: [Float] = []
 }
 
 class Camera : SceneNode {
+    var m_worldMatrix: [Float] = []
+    var m_fov: Float = 0.0
+    var m_aspectRatio: Float = 0.0
     
+    func GetViewMatrix() -> [Float] {
+        return [0.0]
+    }
 }
 
 struct SceneGraph {
@@ -199,17 +235,6 @@ class SceneManager
                                                                       iUV: pUVData,
                                                                       iVertSizeInBytes: VertSizeInByte(iVertLayout: vertLayout))
                         
-                        
-                        pPosData.withMemoryRebound(to: Float.self) { (ptr: UnsafeMutableBufferPointer<Float>) in
-                            let cnt = ptr.count
-                            for eleIdx in 0..<(cnt / 3) {
-                                print("Pos<", ptr[eleIdx * 3], ",", ptr[eleIdx * 3 + 1], ",", ptr[eleIdx * 3 + 2], ">")
-                            }
-                        }
-                        
-                        
-                        print("Interception")
-                        
                         staticModelNode.m_primitiveShapes.append(primShape)
                     }
                     m_sceneGraph.m_nodes.append(staticModelNode)
@@ -223,6 +248,10 @@ class SceneManager
     init(){
         m_sceneGraph = SceneGraph(m_nodes: [])
         m_curSceneInfo = YamlSceneInfoStruct(sceneName: "", version: nil, sceneObjs: nil)
+    }
+    
+    func IsAssetReady() -> Bool{
+        return m_asset != nil
     }
     
     func AssembleVertexBuffer(iPos: UnsafeMutableRawBufferPointer,
@@ -356,7 +385,19 @@ class SceneManager
         return pData
     }
     
-    func LoadYamlScene(iSceneFilePath: String) -> Bool {
+    /// Send data doesn't change per frame to GPU Buffers. E.g. World matrix or camera matrix may changes per frame so we don't need to send that to GPU.
+    /// However, vertex buffer or index buffer don't change, so we can send them to GPU.
+    func SendStaticDataToGPU(iDevice: MTLDevice) {
+        m_sceneGraph.m_nodes.forEach { (node) in
+            if let staticModelNode = node as? StaticModel {
+                staticModelNode.m_primitiveShapes.forEach { (shape) in
+                    
+                }
+            }
+        }
+    }
+    
+    func LoadYamlScene(iDevice: MTLDevice, iSceneFilePath: String) -> Bool {
         let path = URL(fileURLWithPath: iSceneFilePath)
         let text = try? String(contentsOf: path, encoding: .utf8)
 
@@ -378,6 +419,11 @@ class SceneManager
                             DispatchQueue.main.async{
                                 if status == .complete {
                                     self.m_asset = maybeAsset
+                                    
+                                    if maybeAsset != nil {
+                                        self.SendStaticDataToGPU(iDevice: iDevice)
+                                    }
+                                    
                                 } else if let error = maybeError {
                                     print("Failed to load glTF asset: \(error)")
                                 }
