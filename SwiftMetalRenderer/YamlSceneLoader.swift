@@ -388,10 +388,17 @@ class SceneManager
     /// Send data doesn't change per frame to GPU Buffers. E.g. World matrix or camera matrix may changes per frame so we don't need to send that to GPU.
     /// However, vertex buffer or index buffer don't change, so we can send them to GPU.
     func SendStaticDataToGPU(iDevice: MTLDevice) {
-        m_sceneGraph.m_nodes.forEach { (node) in
-            if let staticModelNode = node as? StaticModel {
-                staticModelNode.m_primitiveShapes.forEach { (shape) in
+        
+        for node in m_sceneGraph.m_nodes {
+            if var staticModelNode = node as? StaticModel {
+                for i in 0..<staticModelNode.m_primitiveShapes.count {
+                    staticModelNode.m_primitiveShapes[i].m_vertBufferMtl = iDevice.makeBuffer(
+                        bytes: staticModelNode.m_primitiveShapes[i].m_vertexData!.baseAddress!,
+                        length: staticModelNode.m_primitiveShapes[i].m_vertexData!.count, options: [])
                     
+                    staticModelNode.m_primitiveShapes[i].m_idxBufferMtl = iDevice.makeBuffer(
+                        bytes: staticModelNode.m_primitiveShapes[i].m_idxData!.baseAddress!,
+                        length: staticModelNode.m_primitiveShapes[i].m_idxData!.count, options: [])
                 }
             }
         }
