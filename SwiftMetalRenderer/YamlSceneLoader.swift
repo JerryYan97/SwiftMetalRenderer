@@ -34,6 +34,19 @@ func ChooseVertexBufferLayout(hasTangent: Bool, hasTexCoord: Bool) -> VertexBuff
     return res
 }
 
+func VertexBufferLayoutAttributeCount(iLayout: VertexBufferLayout) -> Int {
+    switch iLayout {
+    case .POSITION_FLOAT3_NORMAL_FLOAT3:
+        return 2
+    case .POSITION_FLOAT3_NORMAL_FLOAT3_TANGENT_FLOAT3_TEXCOORD0_FLOAT2:
+        return 4
+    case .POSITION_FLOAT3_NORMAL_FLOAT3_TEXCOORD0_FLOAT2:
+        return 3
+    @unknown default:
+        fatalError("Unhandled vertex buffer layout")
+    }
+}
+
 
 struct YamlSceneObjStruct: Codable {
     var objName: String
@@ -95,6 +108,7 @@ struct PrimitiveShape {
     
     var m_idxType: Bool? // 0: uint16_t, 1: uint32_t
     var m_idxData: UnsafeMutableRawBufferPointer?
+    var m_idxCnt: Int?
     
     var m_material: BaseMaterial?
     
@@ -238,8 +252,6 @@ class SceneManager
                         staticModelNode.m_primitiveShapes.append(primShape)
                     }
                     m_sceneGraph.m_nodes.append(staticModelNode)
-                    
-                    
                 }
             }
         }
@@ -402,6 +414,8 @@ class SceneManager
                 }
             }
         }
+        
+        
     }
     
     func LoadYamlScene(iDevice: MTLDevice, iSceneFilePath: String) -> Bool {
