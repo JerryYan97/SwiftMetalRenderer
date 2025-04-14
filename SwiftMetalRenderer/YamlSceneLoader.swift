@@ -106,7 +106,7 @@ struct PrimitiveShape {
     var m_vertexLayout: VertexBufferLayout?
     var m_vertexData: UnsafeMutableRawBufferPointer?
     
-    var m_idxType: Bool? // 0: uint16_t, 1: uint32_t
+    var m_idxType: MTLIndexType?
     var m_idxData: UnsafeMutableRawBufferPointer?
     var m_idxCnt: Int?
     
@@ -243,6 +243,7 @@ class SceneManager
                         primShape.m_vertexLayout = vertLayout
                         primShape.m_idxData = ReadOutAccessorData(iAccessor: prim.indices!)
                         primShape.m_idxType = IsIdxTypeUint32(iIdxAccessor: prim.indices!)
+                        primShape.m_idxCnt = prim.indices!.count
                         primShape.m_vertexData = AssembleVertexBuffer(iPos: pPosData,
                                                                       iNrm: pNormalData,
                                                                       iTangent: pTangentData,
@@ -348,6 +349,16 @@ class SceneManager
             }
         }
         
+#if DEBUG
+        pVertBuffer.withMemoryRebound(to: Float.self, { (ptr: UnsafeMutableBufferPointer<Float>) in
+            for i in 0..<(ptr.count / 3){
+                let idx = i * 3
+                print("<YamlSceneLoader>: vert buffer double check:<", ptr[idx], ",", ptr[idx + 1], ",", ptr[idx + 2], ">")
+            }
+        })
+#endif
+        
+        
         return pVertBuffer
     }
     
@@ -365,8 +376,12 @@ class SceneManager
         }
     }
     
-    func IsIdxTypeUint32(iIdxAccessor: GLTFAccessor) -> Bool{
-        return iIdxAccessor.componentType == .unsignedInt
+    func IsIdxTypeUint32(iIdxAccessor: GLTFAccessor) -> MTLIndexType{
+        if iIdxAccessor.componentType == .unsignedInt {
+            return .uint32
+        } else {
+            return .uint16
+        }
     }
     
     func ReadOutAccessorData(iAccessor: GLTFAccessor) -> UnsafeMutableRawBufferPointer{
@@ -383,8 +398,8 @@ class SceneManager
         
         let pData: UnsafeMutableRawBufferPointer = UnsafeMutableRawBufferPointer.allocate(byteCount: dataBytesCnt, alignment: 1024)
         
-        if bufferView.stride == elementBytesCnt {
-            buffer.data?.copyBytes(to: pData, from: bufferOffset...(dataBytesCnt + bufferOffset))
+        if (bufferView.stride == elementBytesCnt) || (bufferView.stride == 0) {
+            buffer.data?.copyBytes(to: pData, from: bufferOffset..<(dataBytesCnt + bufferOffset))
         }else {
             for i in 0..<componentCount {
                 let srcByteOffset = bufferOffset + i * bufferView.stride

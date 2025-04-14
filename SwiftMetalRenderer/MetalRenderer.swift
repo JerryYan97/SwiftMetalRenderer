@@ -8,13 +8,20 @@
 
 import MetalKit
 
+struct RenderInfoBuffer
+{
+    let modelMatrix : simd_float4x4
+    let vpMatrix    : simd_float4x4
+}
+
 class MetalRenderer: NSObject, MTKViewDelegate {
     // let vertexBuffer: MTLBuffer
     // let idxBuffer: MTLBuffer
-    let pipelineState: MTLRenderPipelineState
-    let commandQueue: MTLCommandQueue
-    let device: MTLDevice
+    // let pipelineState: MTLRenderPipelineState
+    let m_commandQueue: MTLCommandQueue
+    let m_device: MTLDevice
     let m_sceneManager: SceneManager
+    let m_shaderLibrary: MTLLibrary
     
     /*
     let vertices: [Vertex] = [
@@ -33,11 +40,13 @@ class MetalRenderer: NSObject, MTKViewDelegate {
         Vertex(position2d: [1, -1], colorRgb: [1, 0, 0])]
      */
     private var rotationMatrix = matrix_identity_float4x4
+    private var m_tempTransformationMatrix = matrix_identity_float4x4
+    private var m_tempAspect : Float = 0.0
     
     override init(){
-        device = MetalRenderer.createDevice()
+        m_device = MetalRenderer.createDevice()
         m_sceneManager = SceneManager()
-        commandQueue = MetalRenderer.createCmdQueue(iDevice: device)
+        m_commandQueue = MetalRenderer.createCmdQueue(iDevice: m_device)
         /*vertexBuffer = MetalRenderer.createGpuBuffer(iDevice: device,
                                                      bufferData: vertices,
                                                      lenBytes: MemoryLayout<Vertex>.stride * vertices.count)
@@ -47,10 +56,10 @@ class MetalRenderer: NSObject, MTKViewDelegate {
                                                   lenBytes: MemoryLayout<UInt16>.stride * indices.count)
         */
         
-        let library = MetalRenderer.createShaderLibrary(iDevice: device)
-        let vertexFunction = library.makeFunction(name: "vertex_main")
-        let fragmentFunction = library.makeFunction(name: "fragment_main")
-        let vertexDescriptor = MetalRenderer.buildDefaultVertexDescriptor()
+        m_shaderLibrary = MetalRenderer.createShaderLibrary(iDevice: m_device)
+        // let vertexFunction = library.makeFunction(name: "vertex_main")
+        // let fragmentFunction = library.makeFunction(name: "fragment_main")
+        // let buildDefaultVertexDescriptor = MetalRenderer.buildDefaultVertexDescriptor()
         
         /*
         let pipelineDescriptor = MTLRenderPipelineDescriptor()
@@ -62,10 +71,40 @@ class MetalRenderer: NSObject, MTKViewDelegate {
          */
         
         let sceneConfigFile = "/Users/jiaruiyan/Projects/SwiftMetalRenderer/SwiftMetalRenderer/scene/CubeScene.yaml"
-        m_sceneManager.LoadYamlScene(iDevice: device, iSceneFilePath: sceneConfigFile)
+        m_sceneManager.LoadYamlScene(iDevice: m_device, iSceneFilePath: sceneConfigFile)
         
         super.init()
     }
+    
+    // The camera viewing direction in the camera space is the negative z axis.
+    private func PerspectiveMatrix(perspectiveWithAspect aspect: Float, fovy: Float, near: Float, far: Float) -> simd_float4x4{
+        
+        let yy = 1 / tan(fovy * 0.5)
+        let xx = yy / aspect
+        let zRange = far - near
+        let zz = -(far + near) / zRange
+        let ww = -2 * far * near / zRange
+        
+        let perMat : simd_float4x4 = simd_float4x4.init(
+            [xx,  0,  0,  0],
+            [ 0, yy,  0,  0],
+            [ 0,  0, zz, -1],
+            [ 0,  0, ww,  0]
+        )
+        
+        return perMat
+    }
+    
+    /*
+    private func GenViewMatrix(view: [Float], pos: [Float], worldUp: [Float]) -> simd_float4x4
+    {
+        let viewVec = simd_float3(view[0], view[1], view[2])
+        let worldUpVec = simd_float3(worldUp[0], worldUp[1], worldUp[2])
+        var rightVec = cross(viewVec, worldUpVec)
+        rightVec = normalize(rightVec)
+        
+    }
+     */
     
     func mtkView(_ view: MTKView, drawableSizeWillChange size: CGSize) {
         
@@ -84,6 +123,8 @@ class MetalRenderer: NSObject, MTKViewDelegate {
             vertexDescriptor.attributes[1].bufferIndex = 0
             vertexDescriptor.attributes[1].offset = MemoryLayout<Float>.stride * 3
             
+            vertexDescriptor.layouts[0].stride = MemoryLayout<Float>.stride * 6
+            
         case .POSITION_FLOAT3_NORMAL_FLOAT3_TEXCOORD0_FLOAT2:
             vertexDescriptor.attributes[0].format = .float3
             vertexDescriptor.attributes[0].bufferIndex = 0
@@ -96,6 +137,8 @@ class MetalRenderer: NSObject, MTKViewDelegate {
             vertexDescriptor.attributes[2].format = .float2
             vertexDescriptor.attributes[2].bufferIndex = 0
             vertexDescriptor.attributes[2].offset = MemoryLayout<Float>.stride * 6
+            
+            vertexDescriptor.layouts[0].stride = MemoryLayout<Float>.stride * 8
             
         case .POSITION_FLOAT3_NORMAL_FLOAT3_TANGENT_FLOAT3_TEXCOORD0_FLOAT2:
             vertexDescriptor.attributes[0].format = .float3
@@ -114,15 +157,10 @@ class MetalRenderer: NSObject, MTKViewDelegate {
             vertexDescriptor.attributes[3].bufferIndex = 0
             vertexDescriptor.attributes[3].offset = MemoryLayout<Float>.stride * 9
             
+            vertexDescriptor.layouts[0].stride = MemoryLayout<Float>.stride * 9
+            
         default:
             fatalError("Unsupported vertex layout.")
-        }
-        
-        
-        let attrCnt = VertexBufferLayoutAttributeCount(iLayout: iVertLayout)
-        
-        for attrIdx in 0..<attrCnt {
-            
         }
         
         return vertexDescriptor
@@ -130,7 +168,65 @@ class MetalRenderer: NSObject, MTKViewDelegate {
     
     func RenderStaticModelNode(iStaticModelNode: StaticModel, iRenderCmdEncoder: MTLRenderCommandEncoder){
         iStaticModelNode.m_primitiveShapes.forEach { (iPrimitiveShape) in
+            let library = MetalRenderer.createShaderLibrary(iDevice: m_device)
+            var vertexDescriptor = GenVertDescriptor(iVertLayout: iPrimitiveShape.m_vertexLayout!)
+            var fragmentFunction = library.makeFunction(name: "fragment_main")
+            var vertexFunction: MTLFunction
             
+            switch iPrimitiveShape.m_vertexLayout {
+            case .POSITION_FLOAT3_NORMAL_FLOAT3:
+                if let tmpVertFunc = library.makeFunction(name: "vertex_main_POS_NRM") {
+                    vertexFunction = tmpVertFunc
+                } else {
+                    fatalError("Could not find vert func for POS_NRM.")
+                }
+                
+            case .POSITION_FLOAT3_NORMAL_FLOAT3_TEXCOORD0_FLOAT2:
+                if let tmpVertFunc = library.makeFunction(name: "vertex_main_POS_NRM_UV") {
+                    vertexFunction = tmpVertFunc
+                } else {
+                    fatalError("Could not find vert func for POS_NRM_UV.")
+                }
+                
+            case .POSITION_FLOAT3_NORMAL_FLOAT3_TANGENT_FLOAT3_TEXCOORD0_FLOAT2:
+                if let tmpVertFunc = library.makeFunction(name: "vertex_main_POS_NRM_TAN_UV") {
+                    vertexFunction = tmpVertFunc
+                } else {
+                    fatalError("Could not find vert func for vertex_main_POS_NRM_TAN_UV.")
+                }
+            default:
+                fatalError("Invalid vertex layout.")
+            }
+            
+            let pipelineDescriptor = MTLRenderPipelineDescriptor()
+            pipelineDescriptor.colorAttachments[0].pixelFormat = .bgra8Unorm
+            pipelineDescriptor.vertexFunction = vertexFunction
+            pipelineDescriptor.fragmentFunction = fragmentFunction
+            pipelineDescriptor.vertexDescriptor = vertexDescriptor
+            let pipelineState = MetalRenderer.createPipelineState(iDevice: m_device, descriptor: pipelineDescriptor)
+            
+            m_tempTransformationMatrix = matrix_identity_float4x4
+            m_tempTransformationMatrix.columns.3 = simd_float4(0.0, -1.0, -5.0, 1.0)
+            let tmpRotationMatrix = float4x4(rotationY: Float.pi/4)
+            m_tempTransformationMatrix = m_tempTransformationMatrix * tmpRotationMatrix
+            
+            let perspectiveMat = PerspectiveMatrix(perspectiveWithAspect: m_tempAspect, fovy: Float.pi/5, near: 0.1, far: 1000.0)
+            
+            var renderInfo : RenderInfoBuffer = RenderInfoBuffer(modelMatrix: m_tempTransformationMatrix,
+                                                                 vpMatrix: perspectiveMat)
+            
+            iRenderCmdEncoder.setRenderPipelineState(pipelineState)
+            iRenderCmdEncoder.setVertexBuffer(iPrimitiveShape.m_vertBufferMtl, offset: 0, index: 0)
+            
+            iRenderCmdEncoder.setVertexBytes(&renderInfo,
+                                             length: MemoryLayout<RenderInfoBuffer>.stride,
+                                             index: 1)
+            
+            iRenderCmdEncoder.drawIndexedPrimitives(type: .triangle,
+                                                    indexCount: iPrimitiveShape.m_idxCnt!,
+                                                    indexType: iPrimitiveShape.m_idxType!,
+                                                    indexBuffer: iPrimitiveShape.m_idxBufferMtl!,
+                                                    indexBufferOffset: 0)
         }
     }
     
@@ -138,17 +234,14 @@ class MetalRenderer: NSObject, MTKViewDelegate {
         if m_sceneManager.IsAssetReady() {
             if let drawable = view.currentDrawable,
                let renderPassDescriptor = view.currentRenderPassDescriptor {
-                
                 /// Pre-Render Stage
+                /// Update shapes' model matrices (We will directly use 'setVertexBytes' to upload uniform buffers)
+                m_tempAspect = Float(drawable.texture.width) / Float(drawable.texture.height)
                 
-                ///
-                
-                guard let commandBuffer = commandQueue.makeCommandBuffer(),
+                guard let commandBuffer = m_commandQueue.makeCommandBuffer(),
                       let renderEncoder = commandBuffer.makeRenderCommandEncoder(descriptor: renderPassDescriptor) else {
                     fatalError("Could not set up objects for render encoding")
                 }
-                
-                renderEncoder.setRenderPipelineState(pipelineState)
                 
                 /// Opaque Rendering Pass
                 for i in 0..<m_sceneManager.m_sceneGraph.m_nodes.count {
@@ -159,12 +252,6 @@ class MetalRenderer: NSObject, MTKViewDelegate {
                 }
                 ///
                 
-                let vertDescriptor = GenVertDescriptor(iVertLayout: <#T##VertexBufferLayout#>)
-                
-                
-                renderEncoder.setVertexBuffer(vertexBuffer, offset: 0, index: 0)
-                renderEncoder.setVertexBytes(&rotationMatrix, length: MemoryLayout<simd_float4x4>.stride, index: 1)
-                renderEncoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 3)
                 renderEncoder.endEncoding()
                 
                 commandBuffer.present(drawable)
