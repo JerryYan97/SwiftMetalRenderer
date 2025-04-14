@@ -15,60 +15,21 @@ struct RenderInfoBuffer
 }
 
 class MetalRenderer: NSObject, MTKViewDelegate {
-    // let vertexBuffer: MTLBuffer
-    // let idxBuffer: MTLBuffer
-    // let pipelineState: MTLRenderPipelineState
     let m_commandQueue: MTLCommandQueue
     let m_device: MTLDevice
     let m_sceneManager: SceneManager
     let m_shaderLibrary: MTLLibrary
     
-    /*
-    let vertices: [Vertex] = [
-        Vertex(position2d: [-1, 1], colorRgb: [0, 0, 1]),
-        Vertex(position2d: [-1, -1], colorRgb: [1, 1, 1]),
-        Vertex(position2d: [1, -1], colorRgb: [1, 0, 0]),
-        Vertex(position2d: [1, 1], colorRgb: [0, 0, 0])]
-
-    let indices: [UInt16] = [
-        0, 1, 2,
-        3, 0, 2]
-    
-    let vertices: [Vertex] = [
-        Vertex(position2d: [0, 1], colorRgb: [0, 0, 1]),
-        Vertex(position2d: [-1, -1], colorRgb: [1, 1, 1]),
-        Vertex(position2d: [1, -1], colorRgb: [1, 0, 0])]
-     */
     private var rotationMatrix = matrix_identity_float4x4
     private var m_tempTransformationMatrix = matrix_identity_float4x4
     private var m_tempAspect : Float = 0.0
+    private var m_depthTexture : MTLTexture?
     
     override init(){
         m_device = MetalRenderer.createDevice()
         m_sceneManager = SceneManager()
         m_commandQueue = MetalRenderer.createCmdQueue(iDevice: m_device)
-        /*vertexBuffer = MetalRenderer.createGpuBuffer(iDevice: device,
-                                                     bufferData: vertices,
-                                                     lenBytes: MemoryLayout<Vertex>.stride * vertices.count)
-        
-        idxBuffer = MetalRenderer.createGpuBuffer(iDevice: device,
-                                                  bufferData: indices,
-                                                  lenBytes: MemoryLayout<UInt16>.stride * indices.count)
-        */
-        
         m_shaderLibrary = MetalRenderer.createShaderLibrary(iDevice: m_device)
-        // let vertexFunction = library.makeFunction(name: "vertex_main")
-        // let fragmentFunction = library.makeFunction(name: "fragment_main")
-        // let buildDefaultVertexDescriptor = MetalRenderer.buildDefaultVertexDescriptor()
-        
-        /*
-        let pipelineDescriptor = MTLRenderPipelineDescriptor()
-        pipelineDescriptor.colorAttachments[0].pixelFormat = .bgra8Unorm
-        pipelineDescriptor.vertexFunction = vertexFunction
-        pipelineDescriptor.fragmentFunction = fragmentFunction
-        pipelineDescriptor.vertexDescriptor = vertexDescriptor
-        pipelineState = MetalRenderer.createPipelineState(iDevice: device, descriptor: pipelineDescriptor)
-         */
         
         let sceneConfigFile = "/Users/jiaruiyan/Projects/SwiftMetalRenderer/SwiftMetalRenderer/scene/CubeScene.yaml"
         m_sceneManager.LoadYamlScene(iDevice: m_device, iSceneFilePath: sceneConfigFile)
@@ -78,7 +39,6 @@ class MetalRenderer: NSObject, MTKViewDelegate {
     
     // The camera viewing direction in the camera space is the negative z axis.
     private func PerspectiveMatrix(perspectiveWithAspect aspect: Float, fovy: Float, near: Float, far: Float) -> simd_float4x4{
-        
         let yy = 1 / tan(fovy * 0.5)
         let xx = yy / aspect
         let zRange = far - near
@@ -95,16 +55,6 @@ class MetalRenderer: NSObject, MTKViewDelegate {
         return perMat
     }
     
-    /*
-    private func GenViewMatrix(view: [Float], pos: [Float], worldUp: [Float]) -> simd_float4x4
-    {
-        let viewVec = simd_float3(view[0], view[1], view[2])
-        let worldUpVec = simd_float3(worldUp[0], worldUp[1], worldUp[2])
-        var rightVec = cross(viewVec, worldUpVec)
-        rightVec = normalize(rightVec)
-        
-    }
-     */
     
     func mtkView(_ view: MTKView, drawableSizeWillChange size: CGSize) {
         
@@ -200,6 +150,7 @@ class MetalRenderer: NSObject, MTKViewDelegate {
             
             let pipelineDescriptor = MTLRenderPipelineDescriptor()
             pipelineDescriptor.colorAttachments[0].pixelFormat = .bgra8Unorm
+            pipelineDescriptor.depthAttachmentPixelFormat = .depth32Float
             pipelineDescriptor.vertexFunction = vertexFunction
             pipelineDescriptor.fragmentFunction = fragmentFunction
             pipelineDescriptor.vertexDescriptor = vertexDescriptor
@@ -230,12 +181,38 @@ class MetalRenderer: NSObject, MTKViewDelegate {
         }
     }
     
+    private func CreateDepthFunc(_ width: Int, _ height: Int) {
+        var depthTexDescriptor = MTLTextureDescriptor.texture2DDescriptor(
+            pixelFormat: .depth32Float, width: width, height: height, mipmapped: false
+        )
+        depthTexDescriptor.usage = .renderTarget
+        depthTexDescriptor.storageMode = .private
+        
+        m_depthTexture = m_device.makeTexture(descriptor: depthTexDescriptor)
+        m_depthTexture?.label = "Depth Render Target"
+    }
+    
     func draw(in view: MTKView) {
         if m_sceneManager.IsAssetReady() {
             if let drawable = view.currentDrawable,
-               let renderPassDescriptor = view.currentRenderPassDescriptor {
+               var renderPassDescriptor = view.currentRenderPassDescriptor {
                 /// Pre-Render Stage
+                /// Resize depth texture if it's needed or the first time
+                if m_depthTexture == nil {
+                    CreateDepthFunc(drawable.texture.width, drawable.texture.height)
+                } else if m_depthTexture!.width != drawable.texture.width ||
+                          m_depthTexture!.height != drawable.texture.height {
+                    CreateDepthFunc(drawable.texture.width, drawable.texture.height)
+                }
+                
                 /// Update shapes' model matrices (We will directly use 'setVertexBytes' to upload uniform buffers)
+                renderPassDescriptor.colorAttachments[0].loadAction = .clear
+                renderPassDescriptor.colorAttachments[0].storeAction = .store
+                renderPassDescriptor.depthAttachment.texture = m_depthTexture
+                renderPassDescriptor.depthAttachment.clearDepth = 1.0
+                renderPassDescriptor.depthAttachment.loadAction = .clear
+                renderPassDescriptor.depthAttachment.storeAction = .dontCare
+                
                 m_tempAspect = Float(drawable.texture.width) / Float(drawable.texture.height)
                 
                 guard let commandBuffer = m_commandQueue.makeCommandBuffer(),

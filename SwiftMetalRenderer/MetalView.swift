@@ -37,6 +37,7 @@ struct MetalView: NSViewRepresentable {
     func makeNSView(context: Context) -> some NSView {
         let view = MTKView()
         
+        view.clearDepth = 1.0
         view.clearColor = MTLClearColor(red: 0.0, green: 0.0, blue: 0.0, alpha: 1)
         view.device = renderer.m_device
         view.delegate = renderer
