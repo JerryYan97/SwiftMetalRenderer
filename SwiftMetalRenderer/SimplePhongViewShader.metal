@@ -72,13 +72,15 @@ vertex FragmentInput vertex_main_POS_NRM_UV(Vertex_POS_NRM_UV v [[stage_in]],
 }
 
 fragment float4 fragment_main(FragmentInput input [[stage_in]]){
-    float3 lightRadiance(5.0, 5.0, 5.0);
-    float3 lightDir = float3(0, 1, 0) - input.position.xyz;
+    float3 lightRadiance(1.0, 1.0, 1.0);
+    float3 lightDir = float3(1, 3, 0) - input.worldPos.xyz;
+    lightDir = normalize(lightDir);
+    
     float3 normal(input.normal.xyz);
     normal = normalize(normal);
     
     float3 ambient(0.1, 0.1, 0.1);
     float3 diffuse = max(dot(normal, lightDir), 0.0) * lightRadiance;
     
-    return float4(ambient + diffuse, 1.0);
+    return float4(diffuse + ambient, 1.0);
 }

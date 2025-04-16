@@ -148,6 +148,7 @@ class MetalRenderer: NSObject, MTKViewDelegate {
                 fatalError("Invalid vertex layout.")
             }
             
+            ///
             let pipelineDescriptor = MTLRenderPipelineDescriptor()
             pipelineDescriptor.colorAttachments[0].pixelFormat = .bgra8Unorm
             pipelineDescriptor.depthAttachmentPixelFormat = .depth32Float
@@ -155,6 +156,16 @@ class MetalRenderer: NSObject, MTKViewDelegate {
             pipelineDescriptor.fragmentFunction = fragmentFunction
             pipelineDescriptor.vertexDescriptor = vertexDescriptor
             let pipelineState = MetalRenderer.createPipelineState(iDevice: m_device, descriptor: pipelineDescriptor)
+            ///
+            
+            ///
+            let depthStencilDescriptor = MTLDepthStencilDescriptor()
+            depthStencilDescriptor.label = "DepthStencilState"
+            depthStencilDescriptor.depthCompareFunction = .less
+            depthStencilDescriptor.isDepthWriteEnabled = true
+            
+            let depthStencilState = m_device.makeDepthStencilState(descriptor: depthStencilDescriptor)!
+            ///
             
             m_tempTransformationMatrix = matrix_identity_float4x4
             m_tempTransformationMatrix.columns.3 = simd_float4(0.0, -1.0, -5.0, 1.0)
@@ -167,6 +178,7 @@ class MetalRenderer: NSObject, MTKViewDelegate {
                                                                  vpMatrix: perspectiveMat)
             
             iRenderCmdEncoder.setRenderPipelineState(pipelineState)
+            iRenderCmdEncoder.setDepthStencilState(depthStencilState)
             iRenderCmdEncoder.setVertexBuffer(iPrimitiveShape.m_vertBufferMtl, offset: 0, index: 0)
             
             iRenderCmdEncoder.setVertexBytes(&renderInfo,
