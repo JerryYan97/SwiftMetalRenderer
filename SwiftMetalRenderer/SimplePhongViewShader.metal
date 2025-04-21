@@ -26,12 +26,17 @@ struct FragmentInput {
     float4 worldPos;
 };
 
+constant uint RENDER_INFO_MASK0_CNST_BASE_COLOR = 0x00000001;
+constant uint RENDER_INFO_MASK0_CNST_METALLIC_ROUGHNESS = 0x00000002;
+
 struct RenderInfoBuffer
 {
     float4x4 modelMatrix;
     float4x4 vpMatrix;
     
-    ///
+    /// renderInfoMask[0]:
+    /// 0x1: Whether the base color is constant;
+    /// 0x2: Whether the metallic-roughness are constants;
     uint4 renderInfoMask;
     ///
     
@@ -40,42 +45,59 @@ struct RenderInfoBuffer
 };
 
 
+struct VertShaderUnifiedInfo
+{
+    float3 vertPosition;
+    float3 vertNormal;
+    RenderInfoBuffer renderInfo;
+};
+
+FragmentInput UnifiedVertexShader_main(VertShaderUnifiedInfo info)
+{
+    float4x4 MVP = info.renderInfo.vpMatrix * info.renderInfo.modelMatrix;
+    
+    return {
+        .position{ MVP * float4(info.vertPosition, 1.0) },
+        .color { float4(1.0, 1.0, 1.0, 1.0) },
+        .normal { info.renderInfo.modelMatrix * float4(info.vertNormal, 0.0) },
+        .worldPos { info.renderInfo.modelMatrix * float4(info.vertPosition, 1.0) }
+    };
+}
+
+
 vertex FragmentInput vertex_main_POS_NRM(Vertex_POS_NRM v [[stage_in]],
                                          constant RenderInfoBuffer &renderInfo [[buffer(1)]])
 {
-    float4x4 MVP = renderInfo.vpMatrix * renderInfo.modelMatrix;
-    
-    return {
-        .position{ MVP * float4(v.position, 1.0) },
-        .color { float4(1.0, 1.0, 1.0, 1.0) },
-        .normal { renderInfo.modelMatrix * float4(v.normal, 0.0) },
-        .worldPos { renderInfo.modelMatrix * float4(v.position, 1.0) }
+    VertShaderUnifiedInfo info {
+        .vertPosition{v.position},
+        .vertNormal{v.normal},
+        .renderInfo = renderInfo
     };
+    
+    return UnifiedVertexShader_main(info);
 }
 
 vertex FragmentInput vertex_main_POS_NRM_TAN_UV(Vertex_POS_NRM_TAN_UV v [[stage_in]],
                                                 constant RenderInfoBuffer &renderInfo [[buffer(1)]])
 {
-    float4x4 MVP = renderInfo.vpMatrix * renderInfo.modelMatrix;
-    
-    return {
-        .position{ MVP * float4(v.position, 1.0) },
-        .color { float4(1.0, 1.0, 1.0, 1.0) },
-        .normal { renderInfo.modelMatrix * float4(v.normal, 0.0) },
-        .worldPos { renderInfo.modelMatrix * float4(v.position, 1.0) }
+    VertShaderUnifiedInfo info {
+        .vertPosition{v.position},
+        .vertNormal{v.normal},
+        .renderInfo = renderInfo
     };
+    
+    return UnifiedVertexShader_main(info);
 }
 
 vertex FragmentInput vertex_main_POS_NRM_UV(Vertex_POS_NRM_UV v [[stage_in]],
                                             constant RenderInfoBuffer &renderInfo [[buffer(1)]]){
-    float4x4 MVP = renderInfo.vpMatrix * renderInfo.modelMatrix;
-    
-    return {
-        .position { MVP * float4(v.position, 1.0) },
-        .color { float4(1.0, 1.0, 1.0, 1.0) },
-        .normal { renderInfo.modelMatrix * float4(v.normal, 0.0) },
-        .worldPos { renderInfo.modelMatrix * float4(v.position, 1.0) }
+    VertShaderUnifiedInfo info {
+        .vertPosition{v.position},
+        .vertNormal{v.normal},
+        .renderInfo = renderInfo
     };
+    
+    return UnifiedVertexShader_main(info);
 }
 
 fragment float4 fragment_main(FragmentInput input [[stage_in]]){
