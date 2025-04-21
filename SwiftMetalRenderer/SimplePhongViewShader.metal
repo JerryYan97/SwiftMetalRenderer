@@ -30,6 +30,13 @@ struct RenderInfoBuffer
 {
     float4x4 modelMatrix;
     float4x4 vpMatrix;
+    
+    ///
+    uint4 renderInfoMask;
+    ///
+    
+    float4 baseColor;
+    float4 pbrInfo; // [0]: metallic; [1]: Roughness;
 };
 
 

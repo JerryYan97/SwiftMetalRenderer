@@ -83,6 +83,7 @@ enum MaterialType
     case Constant
 }
 
+/*
 class BaseMaterial
 {
     let m_materialType: MaterialType
@@ -101,6 +102,17 @@ class ConstantMaterial : BaseMaterial
         super.init(materialType: .Constant)
     }
 }
+ */
+
+class Material
+{
+    var m_baseColorFactor: [Float]?
+    var m_metallicFactor: Float?
+    var m_roughnessFactor: Float?
+    
+    var m_baseColorTexture: MTLTexture?
+    var m_metallicRoughnessTexture: MTLTexture?
+}
 
 struct PrimitiveShape {
     var m_vertexLayout: VertexBufferLayout?
@@ -110,7 +122,7 @@ struct PrimitiveShape {
     var m_idxData: UnsafeMutableRawBufferPointer?
     var m_idxCnt: Int?
     
-    var m_material: BaseMaterial?
+    var m_material: Material?
     
     var m_vertBufferMtl: MTLBuffer?
     var m_idxBufferMtl: MTLBuffer?
@@ -198,6 +210,9 @@ class SceneManager
                 // Parsing the gltf asset
                 print("Intercept m_asset")
                 let assetRef = m_asset!
+                
+                
+                
                 for meshIdx in 0..<assetRef.meshes.count {
                     let meshRef = assetRef.meshes[meshIdx]
                     var staticModelNode: StaticModel = StaticModel(iObjType: Optional.none, iObjName: Optional.none)
@@ -249,6 +264,42 @@ class SceneManager
                                                                       iTangent: pTangentData,
                                                                       iUV: pUVData,
                                                                       iVertSizeInBytes: VertSizeInByte(iVertLayout: vertLayout))
+                        
+                        /// Load Material
+                        assert(prim.material != nil, "Cannot find the material.")
+                        assert(prim.material!.metallicRoughness != nil, "Cannot find the metallicRoughness.")
+                        
+                        let primMaterial = prim.material!
+                        let baseColorFactor = primMaterial.metallicRoughness!.baseColorFactor
+                        let baseColorTex = primMaterial.metallicRoughness!.baseColorTexture
+                        let metallicFactor = primMaterial.metallicRoughness!.metallicFactor
+                        let roughnessFactor = primMaterial.metallicRoughness!.roughnessFactor
+                        let metallicRoughnessTex = primMaterial.metallicRoughness!.metallicRoughnessTexture
+                        
+                        var shapeMaterial : Material = Material()
+                        
+                        if baseColorTex != nil{
+                            assert(false, "Need to support base color texture.")
+                        } else {
+                            let baseColorFactor : [Float] = [baseColorFactor.x,
+                                                             baseColorFactor.y,
+                                                             baseColorFactor.z,
+                                                             baseColorFactor.w]
+                            
+                            shapeMaterial.m_baseColorFactor = baseColorFactor
+                        }
+                        
+                        if metallicRoughnessTex != nil{
+                            assert(false, "Need to support metallicRoughness texture.")
+                        } else {
+                            let metallicFactor : Float = primMaterial.metallicRoughness!.metallicFactor
+                            let roughnessFactor : Float = primMaterial.metallicRoughness!.roughnessFactor
+                            
+                            shapeMaterial.m_roughnessFactor = roughnessFactor
+                            shapeMaterial.m_metallicFactor = metallicFactor
+                        }
+                        
+                        primShape.m_material = shapeMaterial
                         
                         staticModelNode.m_primitiveShapes.append(primShape)
                     }

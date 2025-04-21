@@ -12,6 +12,11 @@ struct RenderInfoBuffer
 {
     let modelMatrix : simd_float4x4
     let vpMatrix    : simd_float4x4
+    
+    let renderInfoMask : simd_uint4
+    
+    let baseColorFactor : simd_float4
+    let pbrInfoFactor   : simd_float4
 }
 
 class MetalRenderer: NSObject, MTKViewDelegate {
@@ -24,6 +29,8 @@ class MetalRenderer: NSObject, MTKViewDelegate {
     private var m_tempTransformationMatrix = matrix_identity_float4x4
     private var m_tempAspect : Float = 0.0
     private var m_depthTexture : MTLTexture?
+    
+    
     
     override init(){
         m_device = MetalRenderer.createDevice()
@@ -117,6 +124,9 @@ class MetalRenderer: NSObject, MTKViewDelegate {
     }
     
     func RenderStaticModelNode(iStaticModelNode: StaticModel, iRenderCmdEncoder: MTLRenderCommandEncoder){
+        /// Generate per scene information
+        var renderInfoMask: simd_uint4 = simd_uint4(0, 0, 0, 0)
+        
         iStaticModelNode.m_primitiveShapes.forEach { (iPrimitiveShape) in
             let library = MetalRenderer.createShaderLibrary(iDevice: m_device)
             var vertexDescriptor = GenVertDescriptor(iVertLayout: iPrimitiveShape.m_vertexLayout!)
@@ -174,8 +184,32 @@ class MetalRenderer: NSObject, MTKViewDelegate {
             
             let perspectiveMat = PerspectiveMatrix(perspectiveWithAspect: m_tempAspect, fovy: Float.pi/5, near: 0.1, far: 1000.0)
             
+            /// Materials populating
+            var baseColorFactor : simd_float4 = simd_float4(0.0, 0.0, 0.0, 1.0)
+            if iPrimitiveShape.m_material!.m_baseColorFactor != nil {
+                let baseColorFactorFltArray = iPrimitiveShape.m_material!.m_baseColorFactor!
+                baseColorFactor = simd_float4(baseColorFactorFltArray[0],
+                                              baseColorFactorFltArray[1],
+                                              baseColorFactorFltArray[2],
+                                              baseColorFactorFltArray[3])
+            }
+            
+            var pbrInfo : simd_float4 = simd_float4(0.0, 0.0, 0.0, 0.0)
+            
+            if iPrimitiveShape.m_material!.m_metallicFactor != nil {
+                pbrInfo.x = iPrimitiveShape.m_material!.m_metallicFactor!
+            }
+            
+            if iPrimitiveShape.m_material!.m_roughnessFactor != nil {
+                pbrInfo.y = iPrimitiveShape.m_material!.m_roughnessFactor!
+            }
+            ///
+            
             var renderInfo : RenderInfoBuffer = RenderInfoBuffer(modelMatrix: m_tempTransformationMatrix,
-                                                                 vpMatrix: perspectiveMat)
+                                                                 vpMatrix: perspectiveMat,
+                                                                 renderInfoMask: renderInfoMask,
+                                                                 baseColorFactor: baseColorFactor,
+                                                                 pbrInfoFactor: pbrInfo)
             
             iRenderCmdEncoder.setRenderPipelineState(pipelineState)
             iRenderCmdEncoder.setDepthStencilState(depthStencilState)
