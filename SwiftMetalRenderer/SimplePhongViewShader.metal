@@ -33,17 +33,19 @@ struct RenderInfoBuffer
 {
     float4x4 modelMatrix;
     float4x4 vpMatrix;
-    
-    /// renderInfoMask[0]:
+};
+
+struct MaterialInfoBuffer
+{
+    /// materialInfoMask[0]:
     /// 0x1: Whether the base color is constant;
     /// 0x2: Whether the metallic-roughness are constants;
-    uint4 renderInfoMask;
+    uint4 materialInfoMask;
     ///
     
     float4 baseColor;
     float4 pbrInfo; // [0]: metallic; [1]: Roughness;
 };
-
 
 struct VertShaderUnifiedInfo
 {
@@ -57,7 +59,7 @@ FragmentInput UnifiedVertexShader_main(VertShaderUnifiedInfo info)
     float4x4 MVP = info.renderInfo.vpMatrix * info.renderInfo.modelMatrix;
     
     return {
-        .position{ MVP * float4(info.vertPosition, 1.0) },
+        .position { MVP * float4(info.vertPosition, 1.0) },
         .color { float4(1.0, 1.0, 1.0, 1.0) },
         .normal { info.renderInfo.modelMatrix * float4(info.vertNormal, 0.0) },
         .worldPos { info.renderInfo.modelMatrix * float4(info.vertPosition, 1.0) }
@@ -100,7 +102,9 @@ vertex FragmentInput vertex_main_POS_NRM_UV(Vertex_POS_NRM_UV v [[stage_in]],
     return UnifiedVertexShader_main(info);
 }
 
-fragment float4 fragment_main(FragmentInput input [[stage_in]]){
+fragment float4 fragment_main(FragmentInput input [[stage_in]],
+                              constant MaterialInfoBuffer &materialInfo [[buffer(1)]]){
+    
     float3 lightRadiance(1.0, 1.0, 1.0);
     float3 lightDir = float3(1, 3, 0) - input.worldPos.xyz;
     lightDir = normalize(lightDir);
@@ -109,7 +113,14 @@ fragment float4 fragment_main(FragmentInput input [[stage_in]]){
     normal = normalize(normal);
     
     float3 ambient(0.1, 0.1, 0.1);
-    float3 diffuse = max(dot(normal, lightDir), 0.0) * lightRadiance;
+    
+    float3 albedo = float3(1.0, 1.0, 1.0);
+    if((materialInfo.materialInfoMask.x & 0x1) > 0)
+    {
+        albedo = materialInfo.baseColor.xyz;
+    }
+    
+    float3 diffuse = max(dot(normal, lightDir), 0.0) * lightRadiance * albedo;
     
     return float4(diffuse + ambient, 1.0);
 }

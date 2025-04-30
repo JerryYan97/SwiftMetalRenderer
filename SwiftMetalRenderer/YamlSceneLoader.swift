@@ -211,8 +211,6 @@ class SceneManager
                 print("Intercept m_asset")
                 let assetRef = m_asset!
                 
-                
-                
                 for meshIdx in 0..<assetRef.meshes.count {
                     let meshRef = assetRef.meshes[meshIdx]
                     var staticModelNode: StaticModel = StaticModel(iObjType: Optional.none, iObjName: Optional.none)
