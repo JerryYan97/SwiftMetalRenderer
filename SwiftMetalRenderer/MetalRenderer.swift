@@ -269,6 +269,7 @@ class MetalRenderer: NSObject, MTKViewDelegate {
                 /// Update shapes' model matrices (We will directly use 'setVertexBytes' to upload uniform buffers)
                 renderPassDescriptor.colorAttachments[0].loadAction = .clear
                 renderPassDescriptor.colorAttachments[0].storeAction = .store
+                renderPassDescriptor.colorAttachments[0].clearColor = MTLClearColor(red: 0.529, green: 0.81, blue: 0.92, alpha: 1.0)
                 renderPassDescriptor.depthAttachment.texture = m_depthTexture
                 renderPassDescriptor.depthAttachment.clearDepth = 1.0
                 renderPassDescriptor.depthAttachment.loadAction = .clear
