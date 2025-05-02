@@ -112,7 +112,7 @@ fragment float4 fragment_main(FragmentInput input [[stage_in]],
     float3 normal(input.normal.xyz);
     normal = normalize(normal);
     
-    float3 ambient(0.1, 0.1, 0.1);
+    float3 ambient = float3(0.529, 0.81, 0.92) * 0.05;
     
     float3 albedo = float3(1.0, 1.0, 1.0);
     if((materialInfo.materialInfoMask.x & 0x1) > 0)
