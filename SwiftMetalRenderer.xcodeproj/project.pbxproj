@@ -7,8 +7,10 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		DAAED2892D85E6830038C342 /* GLTFKit2 in Frameworks */ = {isa = PBXBuildFile; productRef = DAAED2882D85E6830038C342 /* GLTFKit2 */; };
-		DAD68EC62D877E8A00D36881 /* Yams in Frameworks */ = {isa = PBXBuildFile; productRef = DAD68EC52D877E8A00D36881 /* Yams */; };
+		DA4B74182DC6BE59008C4F20 /* GLTFKit2.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = DA4B74162DC6BE3A008C4F20 /* GLTFKit2.framework */; settings = {ATTRIBUTES = (Required, ); }; };
+		DA4B74192DC6BE59008C4F20 /* GLTFKit2.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = DA4B74162DC6BE3A008C4F20 /* GLTFKit2.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		DAD68EC62D877E8A00D36881 /* Yams in Frameworks */ = {isa = PBXBuildFile; productRef = DAD68EC52D877E8A00D36881 /* Yams */; settings = {ATTRIBUTES = (Required, ); }; };
+		DAF6D41A2DC6CA4200736862 /* GLTFKit2.framework in CopyFiles */ = {isa = PBXBuildFile; fileRef = DAF6D4182DC6C33E00736862 /* GLTFKit2.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -26,17 +28,67 @@
 			remoteGlobalIDString = DAAED2472D8136C70038C342;
 			remoteInfo = SwiftMetalRenderer;
 		};
+		DAF6D4172DC6C33E00736862 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = DA4B74062DC6BD89008C4F20 /* GLTFKit2.xcodeproj */;
+			proxyType = 2;
+			remoteGlobalIDString = 834FF1C425C27938001887C2;
+			remoteInfo = GLTFKit2;
+		};
 /* End PBXContainerItemProxy section */
 
+/* Begin PBXCopyFilesBuildPhase section */
+		DA4B741A2DC6BE59008C4F20 /* Embed Frameworks */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 8;
+			dstPath = "";
+			dstSubfolderSpec = 10;
+			files = (
+				DA4B74192DC6BE59008C4F20 /* GLTFKit2.framework in Embed Frameworks */,
+			);
+			name = "Embed Frameworks";
+			runOnlyForDeploymentPostprocessing = 1;
+		};
+		DAF6D4192DC6CA3700736862 /* CopyFiles */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 12;
+			dstPath = "";
+			dstSubfolderSpec = 10;
+			files = (
+				DAF6D41A2DC6CA4200736862 /* GLTFKit2.framework in CopyFiles */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
 /* Begin PBXFileReference section */
+		DA4B74062DC6BD89008C4F20 /* GLTFKit2.xcodeproj */ = {isa = PBXFileReference; lastKnownFileType = "wrapper.pb-project"; name = GLTFKit2.xcodeproj; path = ThirdParty/GltfKit2/GLTFKit2/GLTFKit2.xcodeproj; sourceTree = "<group>"; };
+		DA4B74162DC6BE3A008C4F20 /* GLTFKit2.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; path = GLTFKit2.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		DAAED2482D8136C70038C342 /* SwiftMetalRenderer.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SwiftMetalRenderer.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		DAAED2592D8136C90038C342 /* SwiftMetalRendererTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SwiftMetalRendererTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		DAAED2632D8136C90038C342 /* SwiftMetalRendererUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SwiftMetalRendererUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		DAF6D41B2DC6D52500736862 /* Exceptions for "SwiftMetalRenderer" folder in "SwiftMetalRenderer" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				notes.txt,
+			);
+			target = DAAED2472D8136C70038C342 /* SwiftMetalRenderer */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		DAAED24A2D8136C70038C342 /* SwiftMetalRenderer */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				DAF6D41B2DC6D52500736862 /* Exceptions for "SwiftMetalRenderer" folder in "SwiftMetalRenderer" target */,
+			);
+			explicitFolders = (
+				assets,
+				scene,
+			);
 			path = SwiftMetalRenderer;
 			sourceTree = "<group>";
 		};
@@ -58,7 +110,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				DAD68EC62D877E8A00D36881 /* Yams in Frameworks */,
-				DAAED2892D85E6830038C342 /* GLTFKit2 in Frameworks */,
+				DA4B74182DC6BE59008C4F20 /* GLTFKit2.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -82,6 +134,7 @@
 		DAAED23F2D8136C70038C342 = {
 			isa = PBXGroup;
 			children = (
+				DA4B74062DC6BD89008C4F20 /* GLTFKit2.xcodeproj */,
 				DAAED24A2D8136C70038C342 /* SwiftMetalRenderer */,
 				DAAED25C2D8136C90038C342 /* SwiftMetalRendererTests */,
 				DAAED2662D8136C90038C342 /* SwiftMetalRendererUITests */,
@@ -103,8 +156,17 @@
 		DAD68EC42D877E8A00D36881 /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
+				DA4B74162DC6BE3A008C4F20 /* GLTFKit2.framework */,
 			);
 			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		DAF6D4142DC6C33E00736862 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				DAF6D4182DC6C33E00736862 /* GLTFKit2.framework */,
+			);
+			name = Products;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -117,6 +179,8 @@
 				DAAED2442D8136C70038C342 /* Sources */,
 				DAAED2452D8136C70038C342 /* Frameworks */,
 				DAAED2462D8136C70038C342 /* Resources */,
+				DA4B741A2DC6BE59008C4F20 /* Embed Frameworks */,
+				DAF6D4192DC6CA3700736862 /* CopyFiles */,
 			);
 			buildRules = (
 			);
@@ -127,7 +191,6 @@
 			);
 			name = SwiftMetalRenderer;
 			packageProductDependencies = (
-				DAAED2882D85E6830038C342 /* GLTFKit2 */,
 				DAD68EC52D877E8A00D36881 /* Yams */,
 			);
 			productName = SwiftMetalRenderer;
@@ -213,12 +276,17 @@
 			mainGroup = DAAED23F2D8136C70038C342;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
-				DAAED2872D85E6830038C342 /* XCRemoteSwiftPackageReference "GLTFKit2" */,
 				DAD68EC02D873F5500D36881 /* XCRemoteSwiftPackageReference "Yams" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = DAAED2492D8136C70038C342 /* Products */;
 			projectDirPath = "";
+			projectReferences = (
+				{
+					ProductGroup = DAF6D4142DC6C33E00736862 /* Products */;
+					ProjectRef = DA4B74062DC6BD89008C4F20 /* GLTFKit2.xcodeproj */;
+				},
+			);
 			projectRoot = "";
 			targets = (
 				DAAED2472D8136C70038C342 /* SwiftMetalRenderer */,
@@ -227,6 +295,16 @@
 			);
 		};
 /* End PBXProject section */
+
+/* Begin PBXReferenceProxy section */
+		DAF6D4182DC6C33E00736862 /* GLTFKit2.framework */ = {
+			isa = PBXReferenceProxy;
+			fileType = wrapper.framework;
+			path = GLTFKit2.framework;
+			remoteRef = DAF6D4172DC6C33E00736862 /* PBXContainerItemProxy */;
+			sourceTree = BUILT_PRODUCTS_DIR;
+		};
+/* End PBXReferenceProxy section */
 
 /* Begin PBXResourcesBuildPhase section */
 		DAAED2462D8136C70038C342 /* Resources */ = {
@@ -347,7 +425,7 @@
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
-				SDKROOT = macosx;
+				SDKROOT = iphoneos;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 			};
@@ -403,7 +481,7 @@
 				MACOSX_DEPLOYMENT_TARGET = 15.2;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
-				SDKROOT = macosx;
+				SDKROOT = iphoneos;
 				SWIFT_COMPILATION_MODE = wholemodule;
 			};
 			name = Release;
@@ -425,13 +503,17 @@
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
+					"@executable_path/Frameworks",
 					"@executable_path/../Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = JerryGFXWorkshop.SwiftMetalRenderer;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
+				SUPPORTS_MACCATALYST = NO;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
 			};
 			name = Debug;
 		};
@@ -452,13 +534,17 @@
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
+					"@executable_path/Frameworks",
 					"@executable_path/../Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = JerryGFXWorkshop.SwiftMetalRenderer;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
+				SUPPORTS_MACCATALYST = NO;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
 			};
 			name = Release;
 		};
@@ -572,14 +658,6 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
-		DAAED2872D85E6830038C342 /* XCRemoteSwiftPackageReference "GLTFKit2" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/warrenm/GLTFKit2.git";
-			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 0.5.12;
-			};
-		};
 		DAD68EC02D873F5500D36881 /* XCRemoteSwiftPackageReference "Yams" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/jpsim/Yams.git";
@@ -591,11 +669,6 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
-		DAAED2882D85E6830038C342 /* GLTFKit2 */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = DAAED2872D85E6830038C342 /* XCRemoteSwiftPackageReference "GLTFKit2" */;
-			productName = GLTFKit2;
-		};
 		DAD68EC52D877E8A00D36881 /* Yams */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = DAD68EC02D873F5500D36881 /* XCRemoteSwiftPackageReference "Yams" */;

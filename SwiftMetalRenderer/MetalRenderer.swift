@@ -41,7 +41,26 @@ class MetalRenderer: NSObject, MTKViewDelegate {
         m_commandQueue = MetalRenderer.createCmdQueue(iDevice: m_device)
         m_shaderLibrary = MetalRenderer.createShaderLibrary(iDevice: m_device)
         
-        let sceneConfigFile = "/Users/jiaruiyan/Projects/SwiftMetalRenderer/SwiftMetalRenderer/scene/CubeScene.yaml"
+        let sceneConfigFile = "CubeScene.yaml"
+        
+        
+        let programPath = Bundle.main.bundlePath
+        let exePath = Bundle.main.executablePath ?? ""
+        let rsrcPath = Bundle.main.resourcePath ?? ""
+        print("Program Path: ", programPath, " .Executable Path: ", exePath, "\n")
+        
+        let fileManager = FileManager.default
+        
+        do{
+            let contents = try fileManager.contentsOfDirectory(atPath: rsrcPath)
+            for content in contents{
+                print("item: ", content)
+            }
+        }catch{
+            print("Error Checking File System")
+        }
+        
+        
         m_sceneManager.LoadYamlScene(iDevice: m_device, iSceneFilePath: sceneConfigFile)
         
         super.init()
@@ -189,7 +208,7 @@ class MetalRenderer: NSObject, MTKViewDelegate {
             
             /// Materials populating
             var baseColorFactor : simd_float4 = simd_float4(0.0, 0.0, 0.0, 1.0)
-            var materialInfoMask_x : uint32 = 0
+            var materialInfoMask_x : UInt32 = 0
             if iPrimitiveShape.m_material!.m_baseColorFactor != nil {
                 let baseColorFactorFltArray = iPrimitiveShape.m_material!.m_baseColorFactor!
                 baseColorFactor = simd_float4(baseColorFactorFltArray[0],

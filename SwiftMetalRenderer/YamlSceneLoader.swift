@@ -102,7 +102,7 @@ class ConstantMaterial : BaseMaterial
         super.init(materialType: .Constant)
     }
 }
- */
+*/
 
 class Material
 {
@@ -202,6 +202,8 @@ func GetComponentEleCnt(valDimension : GLTFValueDimension) -> Int {
 class SceneManager
 {
     var m_curSceneInfo: YamlSceneInfoStruct
+    let m_assetPath: String
+    let m_scenePath: String
     
     var m_sceneGraph: SceneGraph
     var m_asset: GLTFAsset? {
@@ -310,6 +312,14 @@ class SceneManager
     init(){
         m_sceneGraph = SceneGraph(m_nodes: [])
         m_curSceneInfo = YamlSceneInfoStruct(sceneName: "", version: nil, sceneObjs: nil)
+        
+        let fileManager = FileManager.default
+        let programPath = Bundle.main.bundlePath
+        let execPath = Bundle.main.executablePath
+        let rsrcPath = Bundle.main.resourcePath
+        print("rsrc path: ", rsrcPath, " .exe path: ", execPath)
+        m_assetPath = rsrcPath! + "/assets"
+        m_scenePath = rsrcPath! + "/scene"
     }
     
     func IsAssetReady() -> Bool{
@@ -478,12 +488,10 @@ class SceneManager
                 }
             }
         }
-        
-        
     }
     
     func LoadYamlScene(iDevice: MTLDevice, iSceneFilePath: String) -> Bool {
-        let path = URL(fileURLWithPath: iSceneFilePath)
+        let path = URL(fileURLWithPath: m_scenePath + "/" + iSceneFilePath)
         let text = try? String(contentsOf: path, encoding: .utf8)
 
         if text != nil {
@@ -491,15 +499,16 @@ class SceneManager
             do {
                 m_curSceneInfo = try decoder.decode(YamlSceneInfoStruct.self, from: text!)
                 
-                let assetDir = "/Users/jiaruiyan/Projects/SwiftMetalRenderer/SwiftMetalRenderer/assets"
-                
                 let sceneObjs = m_curSceneInfo.sceneObjs!
                 for(name, sceneObj) in sceneObjs {
                     print("Name: \(name), Type: \(sceneObj.objType)")
                     
                     if sceneObj.modelPath != nil {
-                        let modelPath = assetDir + "/" + sceneObj.modelPath!
+                        let modelPath = m_assetPath + "/" + sceneObj.modelPath!
                         let gltfModelUrl = URL(fileURLWithPath: modelPath)
+                        
+                        let text = try? String(contentsOf: gltfModelUrl, encoding: .utf8)
+                        
                         GLTFAsset.load(with: gltfModelUrl, options: [:], handler: { (progress, status, maybeAsset, maybeError, _) in
                             DispatchQueue.main.async{
                                 if status == .complete {
@@ -514,6 +523,22 @@ class SceneManager
                                 }
                             }
                         })
+                        /*
+                        GLTFAsset.load(with: gltfModelUrl, options: [:]) { (progress, status, maybeAsset, maybeError, _) in
+                            DispatchQueue.main.async {
+                                if status == .complete {
+                                    self.m_asset = maybeAsset
+                                    
+                                    if maybeAsset != nil {
+                                        self.SendStaticDataToGPU(iDevice: iDevice)
+                                    }
+                                    
+                                } else if let error = maybeError {
+                                    print("Failed to load glTF asset: \(error)")
+                                }
+                            }
+                        }
+                         */
                     }
                     
                 }

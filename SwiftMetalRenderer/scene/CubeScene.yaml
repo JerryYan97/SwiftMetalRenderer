@@ -1,0 +1,14 @@
+sceneName: CubeScene
+version: 1
+sceneObjs:
+    CubeModel:
+        objName: cube1
+        objType: StaticModel
+        modelPath: Box.gltf
+        gltfLoadType: model
+    ActiveCamera:
+        objName: cam1
+        objType: Camera
+        fov: 60
+        farPlane: 1000.0
+        nearPlane: 0.01

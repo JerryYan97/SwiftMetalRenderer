@@ -1,0 +1,3 @@
+[submodule "ThirdParty/GltfKit2"]
+	path = ThirdParty/GltfKit2
+	url = https://github.com/warrenm/GLTFKit2.git

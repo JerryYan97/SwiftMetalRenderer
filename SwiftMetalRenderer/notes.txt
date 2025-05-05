@@ -3,6 +3,12 @@ Milestones:
 (1): MAC and Phone Cube demo;
 (1.1): Cube on MAC (Checked).
 (1.2): Cube on iphone.
+-- Not sure why that I am fighting the build error for a day but the normal gltf viewer doesn't have this problem...
+-- I have to follow: https://stackoverflow.com/questions/24333981/ios-app-with-framework-crashed-on-device-dyld-library-not-loaded-xcode-6-beta to make the link framework optional, but it's different from what the example project shows...
+
+-- Ok the above solution has a problem. That doesn't link in the real machine code. So, the gltf func doesn't do any works.
+-- The problem still exists in the 'linking -- search path'. After figuring out that I can open the bundle, everything becomes easy to see what does the linker see.
+
 
 
 (2): Texture Cube on MAC and Phone;
