@@ -2,7 +2,7 @@ Milestones:
 
 (1): MAC and Phone Cube demo;
 (1.1): Cube on MAC (Checked).
-(1.2): Cube on iphone.
+(1.2): Cube on iphone. (Checked).
 -- Not sure why that I am fighting the build error for a day but the normal gltf viewer doesn't have this problem...
 -- I have to follow: https://stackoverflow.com/questions/24333981/ios-app-with-framework-crashed-on-device-dyld-library-not-loaded-xcode-6-beta to make the link framework optional, but it's different from what the example project shows...
 
@@ -15,6 +15,7 @@ Milestones:
 (2.1): Texture Load & Material hook up.
 (2.2): Finish on MAC.
 (2.3): Finish on iPhone.
+-- NSImage on MAC (AppKit) and UIImage on IOS (UIKit)
 
 
 (3): PBR related - default point lights scene
@@ -22,3 +23,8 @@ Milestones:
 (3.2): Default 4 lights setup -- Use PBR balls to check port results.
 (3.3): Make sure iphone also works.
 (3.4): Implement other gltf basic models.
+
+(4): Github, Gallay, Resume, marketing camera clean up
+(4.1): Add UI control for object rotation, camera dist control, and limited camera vertical view rotation control.
+(4.3): Video of MacOS and IOS on Youtube.
+(4.4): Github and personal website gallay update.

@@ -1,10 +1,10 @@
-sceneName: CubeScene
+sceneName: DefaultScene
 version: 1
 sceneObjs:
     CubeModel:
         objName: cube1
         objType: StaticModel
-        modelPath: Box.gltf
+        modelPath: BoxTextured.gltf
         gltfLoadType: model
     ActiveCamera:
         objName: cam1

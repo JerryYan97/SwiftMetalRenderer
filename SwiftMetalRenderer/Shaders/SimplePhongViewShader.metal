@@ -24,6 +24,7 @@ struct FragmentInput {
     float4 color;
     float4 normal;
     float4 worldPos;
+    float2 uv;
 };
 
 constant uint RENDER_INFO_MASK0_CNST_BASE_COLOR = 0x00000001;
@@ -51,6 +52,7 @@ struct VertShaderUnifiedInfo
 {
     float3 vertPosition;
     float3 vertNormal;
+    float2 vertUV;
     RenderInfoBuffer renderInfo;
 };
 
@@ -61,11 +63,11 @@ FragmentInput UnifiedVertexShader_main(VertShaderUnifiedInfo info)
     return {
         .position { MVP * float4(info.vertPosition, 1.0) },
         .color { float4(1.0, 1.0, 1.0, 1.0) },
+        .uv { info.vertUV },
         .normal { info.renderInfo.modelMatrix * float4(info.vertNormal, 0.0) },
         .worldPos { info.renderInfo.modelMatrix * float4(info.vertPosition, 1.0) }
     };
 }
-
 
 vertex FragmentInput vertex_main_POS_NRM(Vertex_POS_NRM v [[stage_in]],
                                          constant RenderInfoBuffer &renderInfo [[buffer(1)]])
@@ -96,6 +98,7 @@ vertex FragmentInput vertex_main_POS_NRM_UV(Vertex_POS_NRM_UV v [[stage_in]],
     VertShaderUnifiedInfo info {
         .vertPosition{v.position},
         .vertNormal{v.normal},
+        .vertUV{v.uv},
         .renderInfo = renderInfo
     };
     
@@ -103,7 +106,11 @@ vertex FragmentInput vertex_main_POS_NRM_UV(Vertex_POS_NRM_UV v [[stage_in]],
 }
 
 fragment float4 fragment_main(FragmentInput input [[stage_in]],
-                              constant MaterialInfoBuffer &materialInfo [[buffer(1)]]){
+                              constant MaterialInfoBuffer &materialInfo [[buffer(1)]],
+                              texture2d<float> albedoTex [[texture(1)]],
+                              sampler albedoSampler[[sampler(1)]]){
+    
+    // constexpr sampler defaultSampler(mag_filter::linear, min_filter::linear);
     
     float3 lightRadiance(1.0, 1.0, 1.0);
     float3 lightDir = float3(1, 3, 0) - input.worldPos.xyz;
@@ -119,8 +126,17 @@ fragment float4 fragment_main(FragmentInput input [[stage_in]],
     {
         albedo = materialInfo.baseColor.xyz;
     }
+    else
+    {
+        albedo = albedoTex.sample(albedoSampler, input.uv).xyz;
+    }
     
     float3 diffuse = max(dot(normal, lightDir), 0.0) * lightRadiance * albedo;
+    float3 finalColor = diffuse + ambient;
     
-    return float4(diffuse + ambient, 1.0);
+    // Gamma Correction
+    finalColor = finalColor / (finalColor + float3(1.0, 1.0, 1.0));
+    finalColor = pow(finalColor, float3(1.0 / 2.2, 1.0 / 2.2, 1.0 / 2.2));
+    
+    return float4(finalColor, 1.0);
 }

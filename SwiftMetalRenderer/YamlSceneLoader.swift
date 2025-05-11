@@ -4,6 +4,13 @@
 //
 //  Created by Jiarui Yan on 3/16/25.
 //
+
+#if os(iOS)
+import UIKit
+#elseif os(macOS)
+import AppKit
+#endif
+
 import Foundation
 import Yams
 import GLTFKit2
@@ -111,7 +118,10 @@ class Material
     var m_roughnessFactor: Float?
     
     var m_baseColorTexture: MTLTexture?
+    var m_baseColorTexSampler: MTLSamplerState?
+    
     var m_metallicRoughnessTexture: MTLTexture?
+    var m_metallicRoughnessTexSampler: MTLSamplerState?
 }
 
 struct PrimitiveShape {
@@ -205,7 +215,10 @@ class SceneManager
     let m_assetPath: String
     let m_scenePath: String
     
+    var m_mtlDevice: MTLDevice?
+    
     var m_sceneGraph: SceneGraph
+    
     var m_asset: GLTFAsset? {
         didSet{
             if m_asset != nil {
@@ -278,8 +291,36 @@ class SceneManager
                         
                         var shapeMaterial : Material = Material()
                         
+                        // NSImage
                         if baseColorTex != nil{
-                            assert(false, "Need to support base color texture.")
+                            var samplerDesc : MTLSamplerDescriptor = MTLSamplerDescriptor()
+                            samplerDesc.minFilter = .linear
+                            samplerDesc.magFilter = .linear
+                            
+                            switch baseColorTex!.texture.sampler!.wrapS {
+                            case .clampToEdge:
+                                samplerDesc.sAddressMode = .clampToEdge
+                            case .mirroredRepeat:
+                                samplerDesc.sAddressMode = .mirrorRepeat
+                            case .repeat:
+                                samplerDesc.sAddressMode = .repeat
+                            @unknown default:
+                                fatalError()
+                            }
+                            
+                            switch baseColorTex!.texture.sampler!.wrapT {
+                            case .clampToEdge:
+                                samplerDesc.tAddressMode = .clampToEdge
+                            case .mirroredRepeat:
+                                samplerDesc.tAddressMode = .mirrorRepeat
+                            case .repeat:
+                                samplerDesc.tAddressMode = .repeat
+                            @unknown default:
+                                fatalError()
+                            }
+                            
+                            shapeMaterial.m_baseColorTexSampler = m_mtlDevice!.makeSamplerState(descriptor: samplerDesc)
+                            shapeMaterial.m_baseColorTexture = LoadImageToGPU(gltfTex: baseColorTex!)
                         } else {
                             let baseColorFactor : [Float] = [baseColorFactor.x,
                                                              baseColorFactor.y,
@@ -290,7 +331,7 @@ class SceneManager
                         }
                         
                         if metallicRoughnessTex != nil{
-                            assert(false, "Need to support metallicRoughness texture.")
+                            shapeMaterial.m_metallicRoughnessTexture = LoadImageToGPU(gltfTex: metallicRoughnessTex!)
                         } else {
                             let metallicFactor : Float = primMaterial.metallicRoughness!.metallicFactor
                             let roughnessFactor : Float = primMaterial.metallicRoughness!.roughnessFactor
@@ -324,6 +365,87 @@ class SceneManager
     
     func IsAssetReady() -> Bool{
         return m_asset != nil
+    }
+    
+    func LoadImageToGPU(gltfTex: GLTFTextureParams) -> MTLTexture {
+        #if os(iOS)
+        let tmpCiImage = CIImage(contentsOf: gltfTex.texture.source!.uri!)!
+        
+        let ciImgExt = tmpCiImage.extent
+        let ciColSpaceName = tmpCiImage.colorSpace!.name! as String
+        let ciColorSpace = tmpCiImage.colorSpace!
+        
+        print("Color Space: \(ciColSpaceName)", ", Extent: \(ciImgExt)", ", Num Component: \(ciColorSpace.numberOfComponents)")
+        
+        let context = CIContext(options: nil)
+        let cgSPLinear = CGColorSpace(name: CGColorSpace.genericRGBLinear)
+        let cgImage = context.createCGImage(tmpCiImage, from: ciImgExt, format: .RGBA8, colorSpace: cgSPLinear)
+        
+        print("CG Image -- Width: \(cgImage!.width), Height: \(cgImage!.height), Bits Per Component: \(cgImage!.bitsPerComponent), Bits Per Pixel: \(cgImage!.bitsPerPixel), Bytes Per Row: \(cgImage!.bytesPerRow), Color Space: \(String(describing: cgImage!.colorSpace)), pixel format: \(String(describing: cgImage!.pixelFormatInfo)), Component Count: \(cgImage!.colorSpace!.numberOfComponents), Alpha Info: \(String(describing: cgImage!.alphaInfo))")
+        
+        let dataPtr = CFDataGetBytePtr(cgImage?.dataProvider?.data)
+        
+        let pixWidth : Int = cgImage?.width ?? 0
+        let pixHeight : Int = cgImage?.height ?? 0
+        
+        assert(cgImage != nil, "Faid to load image.")
+        #elseif os(macOS)
+        var loadImg = NSImage(contentsOf: gltfTex.texture.source!.uri!)
+        let imageNSData = NSData(contentsOf: gltfTex.texture.source!.uri!)
+        let imageData = Data(referencing: imageNSData!)
+        assert(loadImg != nil, "Faid to load image.")
+        assert(loadImg!.representations.isEmpty == false, "Failed to load image.")
+        #endif
+        
+        var pixelData : [Float] = []
+        
+        #if os(iOS)
+        // TODO: Need to have a more general data parser to consider color space, component types.
+        for column in 0 ..< pixWidth {
+            for row in 0 ..< pixHeight{
+                let pixelIdx = column * pixWidth + row
+                let r_raw : UInt8 = dataPtr![pixelIdx * 4]
+                let g_raw : UInt8 = dataPtr![pixelIdx * 4 + 1]
+                let b_raw : UInt8 = dataPtr![pixelIdx * 4 + 2]
+                let a_raw : UInt8 = dataPtr![pixelIdx * 4 + 3]
+                
+                pixelData.append(Float(r_raw) / 255.0)
+                pixelData.append(Float(g_raw) / 255.0)
+                pixelData.append(Float(b_raw) / 255.0)
+                pixelData.append(Float(a_raw) / 255.0)
+            }
+        }
+        
+        #elseif os(macOS)
+        let rep : NSBitmapImageRep = loadImg!.representations[0] as! NSBitmapImageRep
+        
+        print("Color Space: \(rep.colorSpace)")
+        
+        let pixWidth : Int = rep.pixelsWide
+        let pixHeight : Int = rep.pixelsHigh
+        
+        for i in 0 ..< rep.pixelsWide {
+            for j in 0 ..< rep.pixelsHigh {
+                let color_ij = rep.colorAt(x: i, y: j)!
+                pixelData.append(Float(color_ij.redComponent))
+                pixelData.append(Float(color_ij.greenComponent))
+                pixelData.append(Float(color_ij.blueComponent))
+                pixelData.append(Float(color_ij.alphaComponent))
+            }
+        }
+        #endif
+        
+        // I may have to follow the doc to copy out texture data.
+        let texDesc = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: .rgba32Float, width: pixWidth, height: pixHeight, mipmapped: false)
+        
+        let mtlTex = m_mtlDevice!.makeTexture(descriptor: texDesc)
+        assert(mtlTex != nil, "Failed to create texture.")
+        
+        let cpyRegion : MTLRegion = MTLRegion(origin: MTLOrigin(x: 0, y: 0, z: 0),
+                                              size: MTLSize(width: mtlTex!.width, height: mtlTex!.height, depth: 1))
+        
+        mtlTex?.replace(region: cpyRegion, mipmapLevel: 0, withBytes: pixelData, bytesPerRow: 16 * mtlTex!.width)
+        return mtlTex!
     }
     
     func AssembleVertexBuffer(iPos: UnsafeMutableRawBufferPointer,
@@ -493,7 +615,9 @@ class SceneManager
     func LoadYamlScene(iDevice: MTLDevice, iSceneFilePath: String) -> Bool {
         let path = URL(fileURLWithPath: m_scenePath + "/" + iSceneFilePath)
         let text = try? String(contentsOf: path, encoding: .utf8)
-
+        
+        m_mtlDevice = iDevice
+        
         if text != nil {
             let decoder = YAMLDecoder()
             do {

@@ -41,7 +41,7 @@ class MetalRenderer: NSObject, MTKViewDelegate {
         m_commandQueue = MetalRenderer.createCmdQueue(iDevice: m_device)
         m_shaderLibrary = MetalRenderer.createShaderLibrary(iDevice: m_device)
         
-        let sceneConfigFile = "CubeScene.yaml"
+        let sceneConfigFile = "DefaultScene.yaml"
         
         
         let programPath = Bundle.main.bundlePath
@@ -252,6 +252,16 @@ class MetalRenderer: NSObject, MTKViewDelegate {
             iRenderCmdEncoder.setFragmentBytes(&materialInfo,
                                                length: MemoryLayout<MaterialInfoBuffer>.stride,
                                                index: 1)
+            
+            if iPrimitiveShape.m_material!.m_baseColorTexture != nil {
+                iRenderCmdEncoder.setFragmentTexture(iPrimitiveShape.m_material!.m_baseColorTexture,
+                                                     index: 1)
+                
+                iRenderCmdEncoder.setFragmentSamplerState(iPrimitiveShape.m_material!.m_baseColorTexSampler,
+                                                          index: 1)
+            }
+            
+            
             
             iRenderCmdEncoder.drawIndexedPrimitives(type: .triangle,
                                                     indexCount: iPrimitiveShape.m_idxCnt!,
