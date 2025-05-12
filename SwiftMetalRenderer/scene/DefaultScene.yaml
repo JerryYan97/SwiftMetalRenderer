@@ -1,10 +1,10 @@
-sceneName: DefaultScene
+sceneName: CubeScene
 version: 1
 sceneObjs:
     CubeModel:
         objName: cube1
         objType: StaticModel
-        modelPath: BoxTextured.gltf
+        modelPath: CompareBaseColor/CompareBaseColor.gltf
         gltfLoadType: model
     ActiveCamera:
         objName: cam1

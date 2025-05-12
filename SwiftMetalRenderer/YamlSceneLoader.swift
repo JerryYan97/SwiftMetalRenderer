@@ -120,8 +120,14 @@ class Material
     var m_baseColorTexture: MTLTexture?
     var m_baseColorTexSampler: MTLSamplerState?
     
+    var m_normalMapTexture: MTLTexture?
+    var m_normalMapSampler: MTLSamplerState?
+    
     var m_metallicRoughnessTexture: MTLTexture?
     var m_metallicRoughnessTexSampler: MTLSamplerState?
+    
+    var m_aoMapTexture: MTLTexture?
+    var m_aoMapSampler: MTLSamplerState?
 }
 
 struct PrimitiveShape {
@@ -291,6 +297,11 @@ class SceneManager
                         
                         var shapeMaterial : Material = Material()
                         
+                        let samplerDefaultDesc : MTLSamplerDescriptor = MTLSamplerDescriptor()
+                        shapeMaterial.m_normalMapSampler = m_mtlDevice!.makeSamplerState(descriptor: samplerDefaultDesc)
+                        shapeMaterial.m_metallicRoughnessTexSampler = m_mtlDevice!.makeSamplerState(descriptor: samplerDefaultDesc)
+                        shapeMaterial.m_aoMapSampler = m_mtlDevice!.makeSamplerState(descriptor: samplerDefaultDesc)
+                        
                         // NSImage
                         if baseColorTex != nil{
                             var samplerDesc : MTLSamplerDescriptor = MTLSamplerDescriptor()
@@ -328,6 +339,7 @@ class SceneManager
                                                              baseColorFactor.w]
                             
                             shapeMaterial.m_baseColorFactor = baseColorFactor
+                            shapeMaterial.m_baseColorTexSampler = m_mtlDevice!.makeSamplerState(descriptor: samplerDefaultDesc)
                         }
                         
                         if metallicRoughnessTex != nil{
@@ -468,7 +480,7 @@ class SceneManager
             let pPosSrc = iPos.baseAddress?.advanced(by: posSrcOffset)
             pPosDst?.copyMemory(from: pPosSrc!, byteCount: MemoryLayout<Float>.stride * 3)
             
-#if DEBUG
+#if DEBUG && DEGPRINT
             pPosSrc?.withMemoryRebound(to: Float.self, capacity: 3, { (ptr: UnsafeMutablePointer<Float>) in
                 print("<YamlSceneLoader>: pos:<", ptr.pointee, ",", ptr.advanced(by: 1).pointee, ",", ptr.advanced(by: 2).pointee, ">")
             })
@@ -484,7 +496,7 @@ class SceneManager
             let pNrmSrc = iNrm.baseAddress?.advanced(by: nrmSrcOffset)
             pNormalDst?.copyMemory(from: pNrmSrc!, byteCount: nrmSizeInByte)
             
-#if DEBUG
+#if DEBUG && DEGPRINT
             pNormalDst?.withMemoryRebound(to: Float.self, capacity: 3, { (ptr: UnsafeMutablePointer<Float>) in
                 print("<YamlSceneLoader>: Normal:<", ptr.pointee, ",", ptr.advanced(by: 1).pointee, ",", ptr.advanced(by: 2).pointee, ">")
             })
@@ -502,7 +514,7 @@ class SceneManager
                 
                 pTangentDst?.copyMemory(from: pTangentSrc!, byteCount: tangentSizeInByte)
                 
-#if DEBUG
+#if DEBUG && DEGPRINT
                 pTangentDst?.withMemoryRebound(to: Float.self, capacity: 3, { (ptr: UnsafeMutablePointer<Float>) in
                     print("<YamlSceneLoader>: Tangent:<", ptr.pointee, ",", ptr.advanced(by: 1).pointee, ",", ptr.advanced(by: 2).pointee, ">")
                 })
@@ -521,7 +533,7 @@ class SceneManager
                 
                 pUVDst?.copyMemory(from: pUVSrc!, byteCount: uvSizeInByte)
                 
-#if DEBUG
+#if DEBUG && DEGPRINT
                 pUVDst?.withMemoryRebound(to: Float.self, capacity: 2, { (ptr: UnsafeMutablePointer<Float>) in
                     print("<YamlSceneLoader>: UV:<", ptr.pointee, ",", ptr.advanced(by: 1).pointee, ">")
                     
@@ -530,7 +542,7 @@ class SceneManager
             }
         }
         
-#if DEBUG
+#if DEBUG && DEGPRINT
         pVertBuffer.withMemoryRebound(to: Float.self, { (ptr: UnsafeMutableBufferPointer<Float>) in
             for i in 0..<(ptr.count / 3){
                 let idx = i * 3

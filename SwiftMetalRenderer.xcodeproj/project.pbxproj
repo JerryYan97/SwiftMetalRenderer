@@ -74,6 +74,7 @@
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				notes.txt,
+				Shaders/PBR.metal,
 			);
 			target = DAAED2472D8136C70038C342 /* SwiftMetalRenderer */;
 		};

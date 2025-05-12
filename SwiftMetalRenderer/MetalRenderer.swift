@@ -12,6 +12,7 @@ struct RenderInfoBuffer
 {
     let modelMatrix : simd_float4x4
     let vpMatrix    : simd_float4x4
+    let camPos      : simd_float4
 }
 
 struct MaterialInfoBuffer
@@ -205,6 +206,7 @@ class MetalRenderer: NSObject, MTKViewDelegate {
             m_tempTransformationMatrix = m_tempTransformationMatrix * tmpRotationMatrix
             
             let perspectiveMat = PerspectiveMatrix(perspectiveWithAspect: m_tempAspect, fovy: Float.pi/5, near: 0.1, far: 1000.0)
+            let camPos : simd_float4 = simd_float4(0.0, 0.0, 0.0, 0.0)
             
             /// Materials populating
             var baseColorFactor : simd_float4 = simd_float4(0.0, 0.0, 0.0, 1.0)
@@ -235,7 +237,8 @@ class MetalRenderer: NSObject, MTKViewDelegate {
             materialInfoMask.x = materialInfoMask_x
             
             var renderInfo : RenderInfoBuffer = RenderInfoBuffer(modelMatrix: m_tempTransformationMatrix,
-                                                                 vpMatrix: perspectiveMat)
+                                                                 vpMatrix: perspectiveMat,
+                                                                 camPos: camPos)
             
             var materialInfo : MaterialInfoBuffer = MaterialInfoBuffer(materialInfoMask: materialInfoMask,
                                                                        baseColorFactor: baseColorFactor,
@@ -253,15 +256,22 @@ class MetalRenderer: NSObject, MTKViewDelegate {
                                                length: MemoryLayout<MaterialInfoBuffer>.stride,
                                                index: 1)
             
-            if iPrimitiveShape.m_material!.m_baseColorTexture != nil {
-                iRenderCmdEncoder.setFragmentTexture(iPrimitiveShape.m_material!.m_baseColorTexture,
-                                                     index: 1)
-                
-                iRenderCmdEncoder.setFragmentSamplerState(iPrimitiveShape.m_material!.m_baseColorTexSampler,
-                                                          index: 1)
-            }
+            iRenderCmdEncoder.setFragmentBytes(&renderInfo,
+                                               length: MemoryLayout<RenderInfoBuffer>.stride,
+                                               index: 2)
             
+            // if iPrimitiveShape.m_material!.m_baseColorTexture != nil
+            iRenderCmdEncoder.setFragmentTexture(iPrimitiveShape.m_material!.m_baseColorTexture, index: 1)
+            iRenderCmdEncoder.setFragmentSamplerState(iPrimitiveShape.m_material!.m_baseColorTexSampler, index: 1)
             
+            iRenderCmdEncoder.setFragmentTexture(iPrimitiveShape.m_material!.m_normalMapTexture, index: 2)
+            iRenderCmdEncoder.setFragmentSamplerState(iPrimitiveShape.m_material!.m_normalMapSampler, index: 2)
+            
+            iRenderCmdEncoder.setFragmentTexture(iPrimitiveShape.m_material!.m_metallicRoughnessTexture, index: 3)
+            iRenderCmdEncoder.setFragmentSamplerState(iPrimitiveShape.m_material!.m_metallicRoughnessTexSampler, index: 3)
+            
+            iRenderCmdEncoder.setFragmentTexture(iPrimitiveShape.m_material!.m_aoMapTexture, index: 4)
+            iRenderCmdEncoder.setFragmentSamplerState(iPrimitiveShape.m_material!.m_aoMapSampler, index: 4)
             
             iRenderCmdEncoder.drawIndexedPrimitives(type: .triangle,
                                                     indexCount: iPrimitiveShape.m_idxCnt!,
