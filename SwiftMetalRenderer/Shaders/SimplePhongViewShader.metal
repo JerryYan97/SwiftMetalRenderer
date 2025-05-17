@@ -37,7 +37,8 @@ constant uint RENDER_INFO_MASK0_CNST_AO = 0x00000008;
 struct RenderInfoBuffer
 {
     float4x4 modelMatrix;
-    float4x4 vpMatrix;
+    float4x4 perspectiveMatrix;
+    float4x4 viewMatrix;
     float4 camWorldPos;
 };
 
@@ -64,7 +65,8 @@ struct VertShaderUnifiedInfo
 
 FragmentInput UnifiedVertexShader_main(VertShaderUnifiedInfo info)
 {
-    float4x4 MVP = info.renderInfo.vpMatrix * info.renderInfo.modelMatrix;
+    float4x4 MVP = info.renderInfo.perspectiveMatrix * info.renderInfo.viewMatrix * info.renderInfo.modelMatrix;
+    // float4x4 MVP = info.renderInfo.vpMatrix * info.renderInfo.modelMatrix;
     
     return {
         .position { MVP * float4(info.vertPosition, 1.0) },
@@ -182,7 +184,7 @@ fragment float4 fragment_main(FragmentInput input [[stage_in]],
     }
     
     float3 wo = normalize(renderInfo.camWorldPos.xyz - input.worldPos.xyz);
-        
+    
     float viewNormalCosTheta = max(dot(normal, wo), 0.0);
 
     float3 Lo = float3(0.0, 0.0, 0.0); // Output light values to the view direction.

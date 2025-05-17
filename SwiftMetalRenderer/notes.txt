@@ -11,7 +11,7 @@ Milestones:
 
 
 
-(2): Texture Cube on MAC and Phone;
+(2): Texture Cube on MAC and Phone; (Done)
 (2.1): Texture Load & Material hook up.
 (2.2): Finish on MAC.
 (2.3): Finish on iPhone.
@@ -19,10 +19,12 @@ Milestones:
 
 
 (3): PBR related - default point lights scene
-(3.1): Port Shaders
+(3.1): Port Shaders (Done)
 (3.2): Default 4 lights setup -- Use PBR balls to check port results.
 (3.3): Make sure iphone also works.
 (3.4): Implement other gltf basic models.
+(3.x.1): Proper Camera Model.
+
 
 (4): Github, Gallay, Resume, marketing camera clean up
 (4.1): Add UI control for object rotation, camera dist control, and limited camera vertical view rotation control.

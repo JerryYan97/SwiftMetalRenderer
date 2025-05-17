@@ -130,6 +130,11 @@ class Material
     var m_aoMapSampler: MTLSamplerState?
 }
 
+struct BoundingBox {
+    let min: SIMD3<Float>
+    let max: SIMD3<Float>
+}
+
 struct PrimitiveShape {
     var m_vertexLayout: VertexBufferLayout?
     var m_vertexData: UnsafeMutableRawBufferPointer?
@@ -142,11 +147,15 @@ struct PrimitiveShape {
     
     var m_vertBufferMtl: MTLBuffer?
     var m_idxBufferMtl: MTLBuffer?
+    
+    var m_bbx: BoundingBox?
 }
 
 class StaticModel : SceneNode {
     var m_primitiveShapes: [PrimitiveShape] = []
-    var m_worldMatrix: [Float] = []
+    var m_modelMatrix: simd_float4x4 = simd_float4x4()
+    // var m_worldMatrix: [Float] = []
+    
 }
 
 class Camera : SceneNode {
@@ -154,8 +163,30 @@ class Camera : SceneNode {
     var m_fov: Float = 0.0
     var m_aspectRatio: Float = 0.0
     
-    func GetViewMatrix() -> [Float] {
-        return [0.0]
+    var m_worldPos: simd_float3 = simd_float3()
+    var m_lookAt: simd_float3 = simd_float3()
+    let m_worldUp: simd_float3 = simd_float3(0.0, 1.0, 0.0)
+    
+    func GetViewMatrix() -> simd_float4x4 {
+        let viewNrm = normalize(m_lookAt - m_worldPos)
+        let right = cross(viewNrm, m_worldUp)
+        let rightNrm = normalize(right)
+        let up = cross(rightNrm, viewNrm)
+        let upNrm = normalize(up)
+        
+        let camSpacePositiveZ = -viewNrm
+        
+        let e03: Float = -dot(m_worldPos, rightNrm)
+        let e13: Float = -dot(m_worldPos, upNrm)
+        let e23: Float = -dot(m_worldPos, camSpacePositiveZ)
+        
+        let viewMat : simd_float4x4 = simd_float4x4.init(
+            [rightNrm.x, upNrm.x, camSpacePositiveZ.x, 0.0],
+            [rightNrm.y, upNrm.y, camSpacePositiveZ.y, 0.0],
+            [rightNrm.z, upNrm.z, camSpacePositiveZ.z, 0.0],
+            [e03,        e13,     e23,       1.0])
+        
+        return viewMat
     }
 }
 
@@ -225,6 +256,8 @@ class SceneManager
     
     var m_sceneGraph: SceneGraph
     
+    var m_activeCamera: Camera?
+    
     var m_asset: GLTFAsset? {
         didSet{
             if m_asset != nil {
@@ -232,15 +265,23 @@ class SceneManager
                 print("Intercept m_asset")
                 let assetRef = m_asset!
                 
-                for meshIdx in 0..<assetRef.meshes.count {
-                    let meshRef = assetRef.meshes[meshIdx]
-                    var staticModelNode: StaticModel = StaticModel(iObjType: Optional.none, iObjName: Optional.none)
+                ///
+                for nodeIdx in 0..<assetRef.nodes.count {
+                    // let meshRef = assetRef.meshes[meshIdx]
+                    let nodeRef = assetRef.nodes[nodeIdx]
+                    
+                    assert(nodeRef.mesh != nil, "Node Mesh cannot be nil!")
+                    let meshRef = nodeRef.mesh!
+                    
+                    let staticModelNode: StaticModel = StaticModel(iObjType: Optional.none, iObjName: Optional.none)
+                    staticModelNode.m_modelMatrix = nodeRef.matrix
+                    
                     // Currently only support a single mesh:
                     for primitiveIdx in 0..<meshRef.primitives.count {
                         
-                        #if DEBUG
+#if DEBUG
                         print("<YamlSceneLoader>: prim ", primitiveIdx, ":")
-                        #endif
+#endif
                         
                         let prim = meshRef.primitives[primitiveIdx]
                         let posAttribute = prim.attribute(forName: "POSITION")
@@ -278,11 +319,11 @@ class SceneManager
                         primShape.m_idxData = ReadOutAccessorData(iAccessor: prim.indices!)
                         primShape.m_idxType = IsIdxTypeUint32(iIdxAccessor: prim.indices!)
                         primShape.m_idxCnt = prim.indices!.count
-                        primShape.m_vertexData = AssembleVertexBuffer(iPos: pPosData,
-                                                                      iNrm: pNormalData,
-                                                                      iTangent: pTangentData,
-                                                                      iUV: pUVData,
-                                                                      iVertSizeInBytes: VertSizeInByte(iVertLayout: vertLayout))
+                        (primShape.m_vertexData, primShape.m_bbx) = AssembleVertexBuffer(iPos: pPosData,
+                                                                                         iNrm: pNormalData,
+                                                                                         iTangent: pTangentData,
+                                                                                         iUV: pUVData,
+                                                                                         iVertSizeInBytes: VertSizeInByte(iVertLayout: vertLayout))
                         
                         /// Load Material
                         assert(prim.material != nil, "Cannot find the material.")
@@ -358,6 +399,12 @@ class SceneManager
                     }
                     m_sceneGraph.m_nodes.append(staticModelNode)
                 }
+                
+                /// Post loading activities
+                m_activeCamera = Camera(iObjType: .Camera, iObjName: "MyCamera")
+                m_activeCamera!.m_worldPos = simd_float3(0.0, 0.0, -10.0)
+                m_activeCamera!.m_lookAt = simd_float3(0.0, 0.0, 0.0)
+                m_sceneGraph.m_nodes.append(m_activeCamera!)
             }
         }
     }
@@ -464,10 +511,14 @@ class SceneManager
                               iNrm: UnsafeMutableRawBufferPointer,
                               iTangent: UnsafeMutableRawBufferPointer?,
                               iUV: UnsafeMutableRawBufferPointer?,
-                              iVertSizeInBytes: Int) -> UnsafeMutableRawBufferPointer{
+                              iVertSizeInBytes: Int) -> (UnsafeMutableRawBufferPointer, BoundingBox){
         let vertCnt = iPos.count / (MemoryLayout<Float>.stride * 3)
         let bufferSize = vertCnt * iVertSizeInBytes
         let pVertBuffer: UnsafeMutableRawBufferPointer = UnsafeMutableRawBufferPointer.allocate(byteCount: bufferSize, alignment: 1024)
+        
+        var bboxStart: Bool = false
+        var bbxMin : SIMD3<Float> = SIMD3<Float>()
+        var bbxMax : SIMD3<Float> = SIMD3<Float>()
         
         for i in 0..<vertCnt{
             let startingByteOffset: Int = i * iVertSizeInBytes
@@ -479,6 +530,22 @@ class SceneManager
             let posSrcOffset = MemoryLayout<Float>.stride * 3 * i
             let pPosSrc = iPos.baseAddress?.advanced(by: posSrcOffset)
             pPosDst?.copyMemory(from: pPosSrc!, byteCount: MemoryLayout<Float>.stride * 3)
+            
+            pPosSrc?.withMemoryRebound(to: Float.self, capacity: 3, { (ptr: UnsafeMutablePointer<Float>) in
+                if bboxStart == false{
+                    bbxMin.x = ptr.pointee
+                    bbxMin.y = ptr.advanced(by: 1).pointee
+                    bbxMin.z = ptr.advanced(by: 2).pointee
+                    bbxMax = bbxMin
+                }else{
+                    bbxMin.x = min(bbxMin.x, ptr.pointee)
+                    bbxMin.y = min(bbxMin.y, ptr.advanced(by: 1).pointee)
+                    bbxMin.z = min(bbxMin.z, ptr.advanced(by: 2).pointee)
+                    bbxMax.x = max(bbxMax.x, ptr.pointee)
+                    bbxMax.y = max(bbxMax.y, ptr.advanced(by: 1).pointee)
+                    bbxMax.z = max(bbxMax.z, ptr.advanced(by: 2).pointee)
+                }
+            })
             
 #if DEBUG && DEGPRINT
             pPosSrc?.withMemoryRebound(to: Float.self, capacity: 3, { (ptr: UnsafeMutablePointer<Float>) in
@@ -551,8 +618,7 @@ class SceneManager
         })
 #endif
         
-        
-        return pVertBuffer
+        return (pVertBuffer, BoundingBox(min: bbxMin, max: bbxMax))
     }
     
     func VertSizeInByte(iVertLayout: VertexBufferLayout) -> Int{

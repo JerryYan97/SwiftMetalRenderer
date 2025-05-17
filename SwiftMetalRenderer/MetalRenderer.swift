@@ -7,11 +7,13 @@
 
 
 import MetalKit
+import simd
 
 struct RenderInfoBuffer
 {
     let modelMatrix : simd_float4x4
     let vpMatrix    : simd_float4x4
+    let viewMatrix  : simd_float4x4
     let camPos      : simd_float4
 }
 
@@ -61,7 +63,6 @@ class MetalRenderer: NSObject, MTKViewDelegate {
             print("Error Checking File System")
         }
         
-        
         m_sceneManager.LoadYamlScene(iDevice: m_device, iSceneFilePath: sceneConfigFile)
         
         super.init()
@@ -85,6 +86,27 @@ class MetalRenderer: NSObject, MTKViewDelegate {
         return perMat
     }
     
+    /*
+    private func ViewMatrix(view: simd_float3, pos: simd_float3, worldUp: simd_float3) -> simd_float4x4 {
+        let viewNrm = normalize(view)
+        let right = cross(viewNrm, worldUp)
+        let rightNrm = normalize(right)
+        let up = cross(rightNrm, viewNrm)
+        let upNrm = normalize(up)
+        
+        let e03: Float = -dot(pos, rightNrm)
+        let e13: Float = -dot(pos, upNrm)
+        let e23: Float = -dot(pos, viewNrm)
+        
+        let viewMat : simd_float4x4 = simd_float4x4.init(
+            [rightNrm.x, upNrm.x, viewNrm.x, 0.0],
+            [rightNrm.y, upNrm.y, viewNrm.y, 0.0],
+            [rightNrm.z, upNrm.z, viewNrm.z, 0.0],
+            [e03,        e13,     e23,       1.0])
+        
+        return viewMat
+    }
+     */
     
     func mtkView(_ view: MTKView, drawableSizeWillChange size: CGSize) {
         
@@ -201,12 +223,14 @@ class MetalRenderer: NSObject, MTKViewDelegate {
             ///
             
             m_tempTransformationMatrix = matrix_identity_float4x4
-            m_tempTransformationMatrix.columns.3 = simd_float4(0.0, -1.0, -5.0, 1.0)
+            m_tempTransformationMatrix.columns.3 = simd_float4(1.0, -1.0, -5.0, 1.0)
             let tmpRotationMatrix = float4x4(rotationY: Float.pi/4)
             m_tempTransformationMatrix = m_tempTransformationMatrix * tmpRotationMatrix
             
             let perspectiveMat = PerspectiveMatrix(perspectiveWithAspect: m_tempAspect, fovy: Float.pi/5, near: 0.1, far: 1000.0)
-            let camPos : simd_float4 = simd_float4(0.0, 0.0, 0.0, 0.0)
+            let viewMat = m_sceneManager.m_activeCamera?.GetViewMatrix() ?? matrix_identity_float4x4
+            let camPos: simd_float4 = simd_float4(m_sceneManager.m_activeCamera!.m_worldPos, 0.0)
+            // let camPos : simd_float4 = simd_float4(0.0, 0.0, 0.0, 0.0)
             
             /// Materials populating
             var baseColorFactor : simd_float4 = simd_float4(0.0, 0.0, 0.0, 1.0)
@@ -236,10 +260,15 @@ class MetalRenderer: NSObject, MTKViewDelegate {
             
             materialInfoMask.x = materialInfoMask_x
             
+            /*
             var renderInfo : RenderInfoBuffer = RenderInfoBuffer(modelMatrix: m_tempTransformationMatrix,
                                                                  vpMatrix: perspectiveMat,
                                                                  camPos: camPos)
-            
+            */
+            var renderInfo : RenderInfoBuffer = RenderInfoBuffer(modelMatrix: iStaticModelNode.m_modelMatrix,
+                                                                 vpMatrix: perspectiveMat,
+                                                                 viewMatrix: viewMat,
+                                                                 camPos: camPos)
             var materialInfo : MaterialInfoBuffer = MaterialInfoBuffer(materialInfoMask: materialInfoMask,
                                                                        baseColorFactor: baseColorFactor,
                                                                        pbrInfoFactor: pbrInfo)
@@ -321,7 +350,11 @@ class MetalRenderer: NSObject, MTKViewDelegate {
                     fatalError("Could not set up objects for render encoding")
                 }
                 
+                /// Pre-render prepare
+                
+                
                 /// Opaque Rendering Pass
+                ///
                 for i in 0..<m_sceneManager.m_sceneGraph.m_nodes.count {
                     let sceneNode = m_sceneManager.m_sceneGraph.m_nodes[i]
                     if let staticModelNode = sceneNode as? StaticModel {
