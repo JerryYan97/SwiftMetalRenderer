@@ -23,6 +23,12 @@ struct MaterialInfoBuffer
     
     let baseColorFactor : simd_float4
     let pbrInfoFactor   : simd_float4
+    
+    let texTransBaseColor : simd_float4
+    let texTransMetallicRoughness : simd_float4
+    let texTransNormal : simd_float4
+    let texTransAO : simd_float4
+    let texTransEmissive : simd_float4
 }
 
 class MetalRenderer: NSObject, MTKViewDelegate {
@@ -256,6 +262,11 @@ class MetalRenderer: NSObject, MTKViewDelegate {
                 pbrInfo.y = iPrimitiveShape.m_material!.m_roughnessFactor!
                 materialInfoMask_x |= 0x02
             }
+            
+            if iPrimitiveShape.m_material!.m_emissveTexture != nil {
+                /// Indicate that we use an emissive texture
+                materialInfoMask_x |= 0x10
+            }
             ///
             
             materialInfoMask.x = materialInfoMask_x
@@ -269,9 +280,15 @@ class MetalRenderer: NSObject, MTKViewDelegate {
                                                                  vpMatrix: perspectiveMat,
                                                                  viewMatrix: viewMat,
                                                                  camPos: camPos)
+            
             var materialInfo : MaterialInfoBuffer = MaterialInfoBuffer(materialInfoMask: materialInfoMask,
                                                                        baseColorFactor: baseColorFactor,
-                                                                       pbrInfoFactor: pbrInfo)
+                                                                       pbrInfoFactor: pbrInfo,
+                                                                       texTransBaseColor: iPrimitiveShape.m_material!.m_baseColorTexTrans,
+                                                                       texTransMetallicRoughness: iPrimitiveShape.m_material!.m_metallicRoughnessTexTrans,
+                                                                       texTransNormal: iPrimitiveShape.m_material!.m_normalMapTexTrans,
+                                                                       texTransAO: iPrimitiveShape.m_material!.m_aoMapTexTrans,
+                                                                       texTransEmissive: iPrimitiveShape.m_material!.m_emissveTexTrans)
             
             iRenderCmdEncoder.setRenderPipelineState(pipelineState)
             iRenderCmdEncoder.setDepthStencilState(depthStencilState)
@@ -301,6 +318,9 @@ class MetalRenderer: NSObject, MTKViewDelegate {
             
             iRenderCmdEncoder.setFragmentTexture(iPrimitiveShape.m_material!.m_aoMapTexture, index: 4)
             iRenderCmdEncoder.setFragmentSamplerState(iPrimitiveShape.m_material!.m_aoMapSampler, index: 4)
+            
+            iRenderCmdEncoder.setFragmentTexture(iPrimitiveShape.m_material!.m_emissveTexture, index: 5)
+            iRenderCmdEncoder.setFragmentSamplerState(iPrimitiveShape.m_material!.m_emissveTexSampler, index: 5)
             
             iRenderCmdEncoder.drawIndexedPrimitives(type: .triangle,
                                                     indexCount: iPrimitiveShape.m_idxCnt!,

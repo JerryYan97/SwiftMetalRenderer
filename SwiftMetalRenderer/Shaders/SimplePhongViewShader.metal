@@ -31,8 +31,9 @@ struct FragmentInput {
 
 constant uint RENDER_INFO_MASK0_CNST_BASE_COLOR = 0x00000001;
 constant uint RENDER_INFO_MASK0_CNST_METALLIC_ROUGHNESS = 0x00000002;
-constant uint RENDER_INFO_MASK0_CNST_NORMAL = 0x00000004;
-constant uint RENDER_INFO_MASK0_CNST_AO = 0x00000008;
+constant uint RENDER_INFO_MASK0_NORMAL_MAP = 0x00000004;
+constant uint RENDER_INFO_MASK0_AO_MAP = 0x00000008;
+constant uint RENDER_INFO_MASK0_HAS_EMISSIVE = 0x00000010;
 
 struct RenderInfoBuffer
 {
@@ -52,6 +53,13 @@ struct MaterialInfoBuffer
     
     float4 baseColor;
     float4 pbrInfo; // [0]: metallic; [1]: Roughness;
+    
+    /// [0]: scaleU, [1]: scaleV, [2]: offsetU, [3]: offsetV.
+    float4 texTransBaseColor;
+    float4 texTransMetallicRoughness;
+    float4 texTransNormal;
+    float4 texTransAO;
+    float4 texTransEmissive;
 };
 
 struct VertShaderUnifiedInfo
@@ -115,6 +123,15 @@ vertex FragmentInput vertex_main_POS_NRM_UV(Vertex_POS_NRM_UV v [[stage_in]],
     return UnifiedVertexShader_main(info);
 }
 
+float2 TexTransUV(float2 originalUV, float4 transFactor)
+{
+    float2 scaleUV = float2(transFactor[0], transFactor[1]);
+    float2 offsetUV = float2(transFactor[2], transFactor[3]);
+    
+    // return (originalUV + offsetUV) * scaleUV;
+    return originalUV * scaleUV + offsetUV;
+}
+
 fragment float4 fragment_main(FragmentInput input [[stage_in]],
                               constant MaterialInfoBuffer &materialInfo [[buffer(1)]],
                               constant RenderInfoBuffer &renderInfo [[buffer(2)]],
@@ -125,7 +142,9 @@ fragment float4 fragment_main(FragmentInput input [[stage_in]],
                               texture2d<float> roughnessMetallicTex[[texture(3)]],
                               sampler roughnessMetallicSampler[[sampler(3)]],
                               texture2d<float> aoTex[[texture(4)]],
-                              sampler aoSampler[[sampler(4)]]){
+                              sampler aoSampler[[sampler(4)]],
+                              texture2d<float> emissiveTex[[texture(5)]],
+                              sampler emissiveSampler[[sampler(5)]]){
     
     // constexpr sampler defaultSampler(mag_filter::linear, min_filter::linear);
     
@@ -147,30 +166,31 @@ fragment float4 fragment_main(FragmentInput input [[stage_in]],
     }
     else
     {
-        refAlbedo = albedoTex.sample(albedoSampler, input.uv).xyz;
+        float2 transUV = TexTransUV(input.uv, materialInfo.texTransBaseColor);
+        refAlbedo = albedoTex.sample(albedoSampler, transUV).xyz;
         diffAlbedo = refAlbedo;
     }
     
-    float roughness = 0.0;
+    float roughness = 0.2;
     float metallic = 0.0;
     if((materialInfo.materialInfoMask.x & RENDER_INFO_MASK0_CNST_METALLIC_ROUGHNESS) > 0)
-    {
-        float3 roughnessMetalSample = roughnessMetallicTex.sample(roughnessMetallicSampler, input.uv).xyz;
-        roughness = roughnessMetalSample.g;
-        metallic = roughnessMetalSample.b;
-    }
-    else
     {
         roughness = 0.2;
         metallic = 0.0;
     }
+    else
+    {
+        float2 transUV = TexTransUV(input.uv, materialInfo.texTransMetallicRoughness);
+        float3 roughnessMetalSample = roughnessMetallicTex.sample(roughnessMetallicSampler, transUV).xyz;
+        roughness = roughnessMetalSample.g;
+        metallic = roughnessMetalSample.b;
+    }
     
-    roughness = 0.2;
-    
-    if((materialInfo.materialInfoMask.x & RENDER_INFO_MASK0_CNST_NORMAL) > 0)
+    if((materialInfo.materialInfoMask.x & RENDER_INFO_MASK0_NORMAL_MAP) > 0)
     {
         float3 worldNormal = normal;
-        float3 normalSampled = normalTex.sample(normalTexSampler, input.uv).xyz;
+        float2 transUV = TexTransUV(input.uv, materialInfo.texTransNormal);
+        float3 normalSampled = normalTex.sample(normalTexSampler, transUV).xyz;
         float3 tangent = normalize(input.tangent.xyz);
         float3 biTangent = normalize(cross(worldNormal, tangent));
         normalSampled = normalSampled * 2.0 - 1.0;
@@ -178,9 +198,17 @@ fragment float4 fragment_main(FragmentInput input [[stage_in]],
     }
     
     float aoFactor = 1.0;
-    if((materialInfo.materialInfoMask.x & RENDER_INFO_MASK0_CNST_AO) > 0)
+    if((materialInfo.materialInfoMask.x & RENDER_INFO_MASK0_AO_MAP) > 0)
     {
-        aoFactor = aoTex.sample(aoSampler, input.uv).r;
+        float2 transUV = TexTransUV(input.uv, materialInfo.texTransAO);
+        aoFactor = aoTex.sample(aoSampler, transUV).r;
+    }
+    
+    float3 emissive = float3(0.0, 0.0, 0.0);
+    if((materialInfo.materialInfoMask.x & RENDER_INFO_MASK0_HAS_EMISSIVE) > 0)
+    {
+        float2 transUV = TexTransUV(input.uv, materialInfo.texTransEmissive);
+        emissive = emissiveTex.sample(emissiveSampler, transUV).xyz;
     }
     
     float3 wo = normalize(renderInfo.camWorldPos.xyz - input.worldPos.xyz);
@@ -234,7 +262,7 @@ fragment float4 fragment_main(FragmentInput input [[stage_in]],
     }
     
     float3 ambient = ambientLight.xyz * refAlbedo * aoFactor;
-    float3 finalColor = ambient + Lo;
+    float3 finalColor = ambient + Lo + (emissive * 2);
     
     // Gamma Correction
     finalColor = finalColor / (finalColor + float3(1.0, 1.0, 1.0));

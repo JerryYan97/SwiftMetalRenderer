@@ -54,7 +54,6 @@ func VertexBufferLayoutAttributeCount(iLayout: VertexBufferLayout) -> Int {
     }
 }
 
-
 struct YamlSceneObjStruct: Codable {
     var objName: String
     var objType: String
@@ -119,15 +118,23 @@ class Material
     
     var m_baseColorTexture: MTLTexture?
     var m_baseColorTexSampler: MTLSamplerState?
+    var m_baseColorTexTrans: simd_float4 = simd_float4(1, 1, 0, 0)
     
     var m_normalMapTexture: MTLTexture?
     var m_normalMapSampler: MTLSamplerState?
+    var m_normalMapTexTrans: simd_float4 = simd_float4(1, 1, 0, 0)
     
     var m_metallicRoughnessTexture: MTLTexture?
     var m_metallicRoughnessTexSampler: MTLSamplerState?
+    var m_metallicRoughnessTexTrans: simd_float4 = simd_float4(1, 1, 0, 0)
     
     var m_aoMapTexture: MTLTexture?
     var m_aoMapSampler: MTLSamplerState?
+    var m_aoMapTexTrans: simd_float4 = simd_float4(1, 1, 0, 0)
+    
+    var m_emissveTexture: MTLTexture?
+    var m_emissveTexSampler: MTLSamplerState?
+    var m_emissveTexTrans: simd_float4 = simd_float4(1, 1, 0, 0)
 }
 
 struct BoundingBox {
@@ -261,7 +268,7 @@ class SceneManager
     var m_asset: GLTFAsset? {
         didSet{
             if m_asset != nil {
-                // Parsing the gltf asset
+                /// Parsing the gltf asset
                 print("Intercept m_asset")
                 let assetRef = m_asset!
                 
@@ -335,6 +342,7 @@ class SceneManager
                         let metallicFactor = primMaterial.metallicRoughness!.metallicFactor
                         let roughnessFactor = primMaterial.metallicRoughness!.roughnessFactor
                         let metallicRoughnessTex = primMaterial.metallicRoughness!.metallicRoughnessTexture
+                        let emissiveTex = primMaterial.emissive!.emissiveTexture
                         
                         var shapeMaterial : Material = Material()
                         
@@ -345,34 +353,9 @@ class SceneManager
                         
                         // NSImage
                         if baseColorTex != nil{
-                            var samplerDesc : MTLSamplerDescriptor = MTLSamplerDescriptor()
-                            samplerDesc.minFilter = .linear
-                            samplerDesc.magFilter = .linear
-                            
-                            switch baseColorTex!.texture.sampler!.wrapS {
-                            case .clampToEdge:
-                                samplerDesc.sAddressMode = .clampToEdge
-                            case .mirroredRepeat:
-                                samplerDesc.sAddressMode = .mirrorRepeat
-                            case .repeat:
-                                samplerDesc.sAddressMode = .repeat
-                            @unknown default:
-                                fatalError()
-                            }
-                            
-                            switch baseColorTex!.texture.sampler!.wrapT {
-                            case .clampToEdge:
-                                samplerDesc.tAddressMode = .clampToEdge
-                            case .mirroredRepeat:
-                                samplerDesc.tAddressMode = .mirrorRepeat
-                            case .repeat:
-                                samplerDesc.tAddressMode = .repeat
-                            @unknown default:
-                                fatalError()
-                            }
-                            
-                            shapeMaterial.m_baseColorTexSampler = m_mtlDevice!.makeSamplerState(descriptor: samplerDesc)
+                            shapeMaterial.m_baseColorTexSampler = CreateSampler(gltfSampler: baseColorTex!.texture.sampler!)
                             shapeMaterial.m_baseColorTexture = LoadImageToGPU(gltfTex: baseColorTex!)
+                            shapeMaterial.m_baseColorTexTrans = LoadTexTrans(gltfTex: baseColorTex!)
                         } else {
                             let baseColorFactor : [Float] = [baseColorFactor.x,
                                                              baseColorFactor.y,
@@ -385,12 +368,24 @@ class SceneManager
                         
                         if metallicRoughnessTex != nil{
                             shapeMaterial.m_metallicRoughnessTexture = LoadImageToGPU(gltfTex: metallicRoughnessTex!)
+                            shapeMaterial.m_metallicRoughnessTexSampler = CreateSampler(gltfSampler: metallicRoughnessTex!.texture.sampler!)
+                            shapeMaterial.m_metallicRoughnessTexTrans = LoadTexTrans(gltfTex: metallicRoughnessTex!)
                         } else {
                             let metallicFactor : Float = primMaterial.metallicRoughness!.metallicFactor
                             let roughnessFactor : Float = primMaterial.metallicRoughness!.roughnessFactor
                             
                             shapeMaterial.m_roughnessFactor = roughnessFactor
                             shapeMaterial.m_metallicFactor = metallicFactor
+                        }
+                        
+                        if emissiveTex != nil{
+                            shapeMaterial.m_emissveTexture = LoadImageToGPU(gltfTex: emissiveTex!)
+                            shapeMaterial.m_emissveTexSampler = CreateSampler(gltfSampler: emissiveTex!.texture.sampler!)
+                            shapeMaterial.m_emissveTexTrans = LoadTexTrans(gltfTex: emissiveTex!)
+                        }
+                        else
+                        {
+                            shapeMaterial.m_emissveTexSampler = m_mtlDevice!.makeSamplerState(descriptor: samplerDefaultDesc)
                         }
                         
                         primShape.m_material = shapeMaterial
@@ -402,7 +397,7 @@ class SceneManager
                 
                 /// Post loading activities
                 m_activeCamera = Camera(iObjType: .Camera, iObjName: "MyCamera")
-                m_activeCamera!.m_worldPos = simd_float3(0.0, 0.0, -10.0)
+                m_activeCamera!.m_worldPos = simd_float3(0.0, 0.0, -5.0)
                 m_activeCamera!.m_lookAt = simd_float3(0.0, 0.0, 0.0)
                 m_sceneGraph.m_nodes.append(m_activeCamera!)
             }
@@ -426,7 +421,17 @@ class SceneManager
         return m_asset != nil
     }
     
-    func LoadImageToGPU(gltfTex: GLTFTextureParams) -> MTLTexture {
+    private func LoadTexTrans(gltfTex: GLTFTextureParams) -> simd_float4
+    {
+        if gltfTex.transform == nil{
+            return simd_float4(1.0, 1.0, 0.0, 0.0)
+        }else{
+            print("scale: \(String(describing: gltfTex.transform!.scale)), offset: \(String(describing: gltfTex.transform!.offset))")
+            return simd_float4.init(lowHalf: gltfTex.transform!.scale, highHalf: gltfTex.transform!.offset)
+        }
+    }
+    
+    private func LoadImageToGPU(gltfTex: GLTFTextureParams) -> MTLTexture {
         #if os(iOS)
         let tmpCiImage = CIImage(contentsOf: gltfTex.texture.source!.uri!)!
         
@@ -450,8 +455,8 @@ class SceneManager
         assert(cgImage != nil, "Faid to load image.")
         #elseif os(macOS)
         var loadImg = NSImage(contentsOf: gltfTex.texture.source!.uri!)
-        let imageNSData = NSData(contentsOf: gltfTex.texture.source!.uri!)
-        let imageData = Data(referencing: imageNSData!)
+        // let imageNSData = NSData(contentsOf: gltfTex.texture.source!.uri!)
+        // let imageData = Data(referencing: imageNSData!)
         assert(loadImg != nil, "Faid to load image.")
         assert(loadImg!.representations.isEmpty == false, "Failed to load image.")
         #endif
@@ -460,8 +465,8 @@ class SceneManager
         
         #if os(iOS)
         // TODO: Need to have a more general data parser to consider color space, component types.
-        for column in 0 ..< pixWidth {
-            for row in 0 ..< pixHeight{
+        for row in 0 ..< pixHeight {
+            for column in 0 ..< pixWidth {
                 let pixelIdx = column * pixWidth + row
                 let r_raw : UInt8 = dataPtr![pixelIdx * 4]
                 let g_raw : UInt8 = dataPtr![pixelIdx * 4 + 1]
@@ -477,25 +482,34 @@ class SceneManager
         
         #elseif os(macOS)
         let rep : NSBitmapImageRep = loadImg!.representations[0] as! NSBitmapImageRep
+        let colorSpace = rep.colorSpace
+        
+        let gamma = rep.value(forProperty: NSBitmapImageRep.PropertyKey.gamma)
         
         print("Color Space: \(rep.colorSpace)")
         
         let pixWidth : Int = rep.pixelsWide
         let pixHeight : Int = rep.pixelsHigh
         
-        for i in 0 ..< rep.pixelsWide {
-            for j in 0 ..< rep.pixelsHigh {
-                let color_ij = rep.colorAt(x: i, y: j)!
-                pixelData.append(Float(color_ij.redComponent))
-                pixelData.append(Float(color_ij.greenComponent))
-                pixelData.append(Float(color_ij.blueComponent))
+        for row in 0 ..< pixHeight {
+            for column in 0 ..< pixWidth {
+                let color_ij = rep.colorAt(x: column, y: row)!
+                
+                var gammaFloatUsed : Float = 2.2
+                if let gammaFloat = gamma as? Float {
+                    gammaFloatUsed = gammaFloat
+                }
+                
+                pixelData.append(pow(Float(color_ij.redComponent), gammaFloatUsed))
+                pixelData.append(pow(Float(color_ij.greenComponent), gammaFloatUsed))
+                pixelData.append(pow(Float(color_ij.blueComponent), gammaFloatUsed))
                 pixelData.append(Float(color_ij.alphaComponent))
             }
         }
         #endif
         
         // I may have to follow the doc to copy out texture data.
-        let texDesc = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: .rgba32Float, width: pixWidth, height: pixHeight, mipmapped: false)
+        let texDesc = MTLTextureDescriptor.texture2DDescriptor(pixelFormat:.rgba32Float, width: pixWidth, height: pixHeight, mipmapped: false)
         
         let mtlTex = m_mtlDevice!.makeTexture(descriptor: texDesc)
         assert(mtlTex != nil, "Failed to create texture.")
@@ -505,6 +519,37 @@ class SceneManager
         
         mtlTex?.replace(region: cpyRegion, mipmapLevel: 0, withBytes: pixelData, bytesPerRow: 16 * mtlTex!.width)
         return mtlTex!
+    }
+    
+    private func CreateSampler(gltfSampler: GLTFTextureSampler) -> MTLSamplerState
+    {
+        var samplerDesc : MTLSamplerDescriptor = MTLSamplerDescriptor()
+        samplerDesc.minFilter = .linear
+        samplerDesc.magFilter = .linear
+        
+        switch gltfSampler.wrapS {
+            case .clampToEdge:
+                samplerDesc.sAddressMode = .clampToEdge
+            case .mirroredRepeat:
+                samplerDesc.sAddressMode = .mirrorRepeat
+            case .repeat:
+                samplerDesc.sAddressMode = .repeat
+            @unknown default:
+                fatalError()
+        }
+        
+        switch gltfSampler.wrapT {
+            case .clampToEdge:
+                samplerDesc.tAddressMode = .clampToEdge
+            case .mirroredRepeat:
+                samplerDesc.tAddressMode = .mirrorRepeat
+            case .repeat:
+                samplerDesc.tAddressMode = .repeat
+            @unknown default:
+                fatalError()
+        }
+        
+        return m_mtlDevice!.makeSamplerState(descriptor: samplerDesc)!
     }
     
     func AssembleVertexBuffer(iPos: UnsafeMutableRawBufferPointer,
