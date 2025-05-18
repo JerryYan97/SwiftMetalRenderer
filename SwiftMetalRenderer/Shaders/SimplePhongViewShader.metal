@@ -5,19 +5,22 @@ using namespace metal;
 struct Vertex_POS_NRM {
     float3 position [[attribute(0)]];
     float3 normal [[attribute(1)]];
+    float4 color [[attribute(2)]];
 };
 
 struct Vertex_POS_NRM_UV {
     float3 position [[attribute(0)]];
     float3 normal [[attribute(1)]];
-    float2 uv [[attribute(2)]];
+    float4 color [[attribute(2)]];
+    float2 uv [[attribute(3)]];
 };
 
 struct Vertex_POS_NRM_TAN_UV {
     float3 position [[attribute(0)]];
     float3 normal [[attribute(1)]];
-    float3 tangent [[attribute(2)]];
-    float2 uv [[attribute(3)]];
+    float4 color [[attribute(2)]];
+    float3 tangent [[attribute(3)]];
+    float2 uv [[attribute(4)]];
 };
 
 struct FragmentInput {
@@ -68,6 +71,7 @@ struct VertShaderUnifiedInfo
     float3 vertNormal;
     float3 vertTangent;
     float2 vertUV;
+    float4 vertColor;
     RenderInfoBuffer renderInfo;
 };
 
@@ -78,7 +82,7 @@ FragmentInput UnifiedVertexShader_main(VertShaderUnifiedInfo info)
     
     return {
         .position { MVP * float4(info.vertPosition, 1.0) },
-        .color { float4(1.0, 1.0, 1.0, 1.0) },
+        .color { info.vertColor },
         .uv { info.vertUV },
         .normal { info.renderInfo.modelMatrix * float4(info.vertNormal, 0.0) },
         .tangent { info.renderInfo.modelMatrix * float4(info.vertTangent, 0.0)},
@@ -92,6 +96,7 @@ vertex FragmentInput vertex_main_POS_NRM(Vertex_POS_NRM v [[stage_in]],
     VertShaderUnifiedInfo info {
         .vertPosition{v.position},
         .vertNormal{v.normal},
+        .vertColor{v.color},
         .renderInfo = renderInfo
     };
     
@@ -104,6 +109,7 @@ vertex FragmentInput vertex_main_POS_NRM_TAN_UV(Vertex_POS_NRM_TAN_UV v [[stage_
     VertShaderUnifiedInfo info {
         .vertPosition{v.position},
         .vertNormal{v.normal},
+        .vertColor{v.color},
         .vertTangent{v.tangent},
         .renderInfo = renderInfo
     };
@@ -116,6 +122,7 @@ vertex FragmentInput vertex_main_POS_NRM_UV(Vertex_POS_NRM_UV v [[stage_in]],
     VertShaderUnifiedInfo info {
         .vertPosition{v.position},
         .vertNormal{v.normal},
+        .vertColor{v.color},
         .vertUV{v.uv},
         .renderInfo = renderInfo
     };
@@ -148,7 +155,6 @@ fragment float4 fragment_main(FragmentInput input [[stage_in]],
     
     // constexpr sampler defaultSampler(mag_filter::linear, min_filter::linear);
     
-    // float3 lightRadiance(1.0, 1.0, 1.0);
     float3 lightDir = float3(1, 3, 0) - input.worldPos.xyz;
     lightDir = normalize(lightDir);
     
@@ -157,17 +163,17 @@ fragment float4 fragment_main(FragmentInput input [[stage_in]],
     
     float3 ambientLight = float3(0.529, 0.81, 0.92) * 0.05;
     
-    float3 refAlbedo = float3(1.0, 1.0, 1.0);
-    float3 diffAlbedo = float3(1.0, 1.0, 1.0);
+    float3 refAlbedo = input.color.xyz;
+    float3 diffAlbedo = input.color.xyz;
     if((materialInfo.materialInfoMask.x & RENDER_INFO_MASK0_CNST_BASE_COLOR) > 0)
     {
-        refAlbedo = materialInfo.baseColor.xyz;
-        diffAlbedo = materialInfo.baseColor.xyz;
+        refAlbedo *= materialInfo.baseColor.xyz;
+        diffAlbedo = refAlbedo;
     }
     else
     {
         float2 transUV = TexTransUV(input.uv, materialInfo.texTransBaseColor);
-        refAlbedo = albedoTex.sample(albedoSampler, transUV).xyz;
+        refAlbedo *= albedoTex.sample(albedoSampler, transUV).xyz;
         diffAlbedo = refAlbedo;
     }
     

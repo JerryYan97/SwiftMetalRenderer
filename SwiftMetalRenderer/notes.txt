@@ -23,7 +23,10 @@ Milestones:
 (3.2): Default 4 lights setup -- Use PBR balls to check port results.
 (3.3): Make sure iphone also works.
 (3.4): Implement other gltf basic models.
-(3.x.1): Proper Camera Model.
+(3.4.1): Support vert color. (Done)
+
+(3.x.1): Proper Camera Model. (Done)
+(3.x.2): Advanced feature: MSAA research.
 
 
 (4): Github, Gallay, Resume, marketing camera clean up

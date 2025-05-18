@@ -23,18 +23,18 @@ enum SceneObjectType {
 
 enum VertexBufferLayout
 {
-    case POSITION_FLOAT3_NORMAL_FLOAT3_TANGENT_FLOAT3_TEXCOORD0_FLOAT2
-    case POSITION_FLOAT3_NORMAL_FLOAT3_TEXCOORD0_FLOAT2
-    case POSITION_FLOAT3_NORMAL_FLOAT3
+    case POSITION_FLOAT3_NORMAL_FLOAT3_COLOR_FLOAT4_TANGENT_FLOAT3_TEXCOORD0_FLOAT2
+    case POSITION_FLOAT3_NORMAL_FLOAT3_COLOR_FLOAT4_TEXCOORD0_FLOAT2
+    case POSITION_FLOAT3_NORMAL_FLOAT3_COLOR_FLOAT4
 }
 
 func ChooseVertexBufferLayout(hasTangent: Bool, hasTexCoord: Bool) -> VertexBufferLayout{
-    var res: VertexBufferLayout = .POSITION_FLOAT3_NORMAL_FLOAT3
+    var res: VertexBufferLayout = .POSITION_FLOAT3_NORMAL_FLOAT3_COLOR_FLOAT4
     if hasTangent {
-        res = .POSITION_FLOAT3_NORMAL_FLOAT3_TANGENT_FLOAT3_TEXCOORD0_FLOAT2
+        res = .POSITION_FLOAT3_NORMAL_FLOAT3_COLOR_FLOAT4_TANGENT_FLOAT3_TEXCOORD0_FLOAT2
     } else {
         if hasTexCoord {
-            res = .POSITION_FLOAT3_NORMAL_FLOAT3_TEXCOORD0_FLOAT2
+            res = .POSITION_FLOAT3_NORMAL_FLOAT3_COLOR_FLOAT4_TEXCOORD0_FLOAT2
         }
     }
     
@@ -43,12 +43,12 @@ func ChooseVertexBufferLayout(hasTangent: Bool, hasTexCoord: Bool) -> VertexBuff
 
 func VertexBufferLayoutAttributeCount(iLayout: VertexBufferLayout) -> Int {
     switch iLayout {
-    case .POSITION_FLOAT3_NORMAL_FLOAT3:
-        return 2
-    case .POSITION_FLOAT3_NORMAL_FLOAT3_TANGENT_FLOAT3_TEXCOORD0_FLOAT2:
-        return 4
-    case .POSITION_FLOAT3_NORMAL_FLOAT3_TEXCOORD0_FLOAT2:
+    case .POSITION_FLOAT3_NORMAL_FLOAT3_COLOR_FLOAT4:
         return 3
+    case .POSITION_FLOAT3_NORMAL_FLOAT3_COLOR_FLOAT4_TANGENT_FLOAT3_TEXCOORD0_FLOAT2:
+        return 5
+    case .POSITION_FLOAT3_NORMAL_FLOAT3_COLOR_FLOAT4_TEXCOORD0_FLOAT2:
+        return 4
     @unknown default:
         fatalError("Unhandled vertex buffer layout")
     }
@@ -88,27 +88,6 @@ enum MaterialType
     case None
     case Constant
 }
-
-/*
-class BaseMaterial
-{
-    let m_materialType: MaterialType
-    
-    init(materialType: MaterialType) {
-        self.m_materialType = materialType
-    }
-}
-
-class ConstantMaterial : BaseMaterial
-{
-    let m_diffuseColor: [Float]
-    
-    init(diffuseColor: [Float]) {
-        self.m_diffuseColor = diffuseColor
-        super.init(materialType: .Constant)
-    }
-}
-*/
 
 class Material
 {
@@ -295,6 +274,7 @@ class SceneManager
                         let nrmAttribute = prim.attribute(forName: "NORMAL")
                         let tanAttribute = prim.attribute(forName: "TANGENT")
                         let uvAttribute = prim.attribute(forName: "TEXCOORD_0")
+                        let colorAttribute = prim.attribute(forName: "COLOR_0")
                         
                         assert(posAttribute != nil, "A primitive must have a POSITION attribute")
                         assert(posAttribute!.accessor.componentType == .float, "POSITION attribute must be float components")
@@ -316,6 +296,15 @@ class SceneManager
                         var pUVData : UnsafeMutableRawBufferPointer?
                         if(uvAttribute != nil){
                             pUVData = ReadOutAccessorData(iAccessor: uvAttribute!.accessor)
+                            assert(uvAttribute!.accessor.componentType == .float, "Currently only support float uv.")
+                        }
+                        
+                        var pColorData : UnsafeMutableRawBufferPointer? = nil
+                        var colorComponentCnt : Int = 0
+                        if(colorAttribute != nil){
+                            pColorData = ReadOutAccessorData(iAccessor: colorAttribute!.accessor)
+                            colorComponentCnt = GetComponentEleCnt(valDimension: colorAttribute!.accessor.dimension)
+                            assert(colorAttribute!.accessor.componentType == .float, "Currently only support float color.")
                         }
                         
                         /// Construct the vertex buffer and index buffer
@@ -330,6 +319,7 @@ class SceneManager
                                                                                          iNrm: pNormalData,
                                                                                          iTangent: pTangentData,
                                                                                          iUV: pUVData,
+                                                                                         iColor: (pColorData, colorComponentCnt),
                                                                                          iVertSizeInBytes: VertSizeInByte(iVertLayout: vertLayout))
                         
                         /// Load Material
@@ -556,10 +546,12 @@ class SceneManager
                               iNrm: UnsafeMutableRawBufferPointer,
                               iTangent: UnsafeMutableRawBufferPointer?,
                               iUV: UnsafeMutableRawBufferPointer?,
+                              iColor: (UnsafeMutableRawBufferPointer?, Int),
                               iVertSizeInBytes: Int) -> (UnsafeMutableRawBufferPointer, BoundingBox){
         let vertCnt = iPos.count / (MemoryLayout<Float>.stride * 3)
         let bufferSize = vertCnt * iVertSizeInBytes
         let pVertBuffer: UnsafeMutableRawBufferPointer = UnsafeMutableRawBufferPointer.allocate(byteCount: bufferSize, alignment: 1024)
+        pVertBuffer.initializeMemory(as: UInt8.self, repeating: UInt8(0))
         
         var bboxStart: Bool = false
         var bbxMin : SIMD3<Float> = SIMD3<Float>()
@@ -616,6 +608,30 @@ class SceneManager
             
             curByteOffset += (MemoryLayout<Float>.stride * 3)
             
+            /// Color
+            let pColorDst = pVertBuffer.baseAddress?.advanced(by: curByteOffset)
+            let colorSizeInByte = MemoryLayout<Float>.stride * iColor.1
+            if iColor.0 != nil {
+                let colorSrcOffset = colorSizeInByte * i
+                let pColorSrc = iColor.0!.baseAddress?.advanced(by: colorSrcOffset)
+                
+                var tmpColor: [Float] = [1, 1, 1, 1]
+                
+                pColorSrc?.withMemoryRebound(to: Float.self, capacity: iColor.1, {(ptr: UnsafeMutablePointer<Float>) in
+                    for j in 0..<iColor.1 {
+                        tmpColor[j] = ptr.advanced(by: j).pointee
+                    }
+                })
+                
+                pColorDst?.copyMemory(from: tmpColor, byteCount: MemoryLayout<Float>.stride * 4)
+            }
+            else
+            {
+                let noColor: [Float] = [1.0, 1.0, 1.0, 1.0]
+                pColorDst?.copyMemory(from: noColor, byteCount: MemoryLayout<Float>.stride * 4)
+            }
+            curByteOffset += (MemoryLayout<Float>.stride * 4)
+            
             /// Tangent
             if iTangent != nil{
                 let pTangentDst = pVertBuffer.baseAddress?.advanced(by: curByteOffset)
@@ -668,12 +684,12 @@ class SceneManager
     
     func VertSizeInByte(iVertLayout: VertexBufferLayout) -> Int{
         switch iVertLayout{
-        case .POSITION_FLOAT3_NORMAL_FLOAT3:
-            return MemoryLayout<Float>.stride * 6
-        case .POSITION_FLOAT3_NORMAL_FLOAT3_TANGENT_FLOAT3_TEXCOORD0_FLOAT2:
-            return MemoryLayout<Float>.stride * 11
-        case .POSITION_FLOAT3_NORMAL_FLOAT3_TEXCOORD0_FLOAT2:
-            return MemoryLayout<Float>.stride * 8
+        case .POSITION_FLOAT3_NORMAL_FLOAT3_COLOR_FLOAT4:
+            return MemoryLayout<Float>.stride * 10
+        case .POSITION_FLOAT3_NORMAL_FLOAT3_COLOR_FLOAT4_TANGENT_FLOAT3_TEXCOORD0_FLOAT2:
+            return MemoryLayout<Float>.stride * 15
+        case .POSITION_FLOAT3_NORMAL_FLOAT3_COLOR_FLOAT4_TEXCOORD0_FLOAT2:
+            return MemoryLayout<Float>.stride * 12
         default:
             assert(false, "Unrecognized vertex layout")
             return 0
@@ -770,22 +786,6 @@ class SceneManager
                                 }
                             }
                         })
-                        /*
-                        GLTFAsset.load(with: gltfModelUrl, options: [:]) { (progress, status, maybeAsset, maybeError, _) in
-                            DispatchQueue.main.async {
-                                if status == .complete {
-                                    self.m_asset = maybeAsset
-                                    
-                                    if maybeAsset != nil {
-                                        self.SendStaticDataToGPU(iDevice: iDevice)
-                                    }
-                                    
-                                } else if let error = maybeError {
-                                    print("Failed to load glTF asset: \(error)")
-                                }
-                            }
-                        }
-                         */
                     }
                     
                 }

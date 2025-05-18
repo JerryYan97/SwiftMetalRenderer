@@ -92,28 +92,6 @@ class MetalRenderer: NSObject, MTKViewDelegate {
         return perMat
     }
     
-    /*
-    private func ViewMatrix(view: simd_float3, pos: simd_float3, worldUp: simd_float3) -> simd_float4x4 {
-        let viewNrm = normalize(view)
-        let right = cross(viewNrm, worldUp)
-        let rightNrm = normalize(right)
-        let up = cross(rightNrm, viewNrm)
-        let upNrm = normalize(up)
-        
-        let e03: Float = -dot(pos, rightNrm)
-        let e13: Float = -dot(pos, upNrm)
-        let e23: Float = -dot(pos, viewNrm)
-        
-        let viewMat : simd_float4x4 = simd_float4x4.init(
-            [rightNrm.x, upNrm.x, viewNrm.x, 0.0],
-            [rightNrm.y, upNrm.y, viewNrm.y, 0.0],
-            [rightNrm.z, upNrm.z, viewNrm.z, 0.0],
-            [e03,        e13,     e23,       1.0])
-        
-        return viewMat
-    }
-     */
-    
     func mtkView(_ view: MTKView, drawableSizeWillChange size: CGSize) {
         
     }
@@ -122,7 +100,7 @@ class MetalRenderer: NSObject, MTKViewDelegate {
         let vertexDescriptor = MTLVertexDescriptor()
         
         switch iVertLayout {
-        case .POSITION_FLOAT3_NORMAL_FLOAT3:
+        case .POSITION_FLOAT3_NORMAL_FLOAT3_COLOR_FLOAT4:
             vertexDescriptor.attributes[0].format = .float3
             vertexDescriptor.attributes[0].bufferIndex = 0
             vertexDescriptor.attributes[0].offset = 0
@@ -131,24 +109,13 @@ class MetalRenderer: NSObject, MTKViewDelegate {
             vertexDescriptor.attributes[1].bufferIndex = 0
             vertexDescriptor.attributes[1].offset = MemoryLayout<Float>.stride * 3
             
-            vertexDescriptor.layouts[0].stride = MemoryLayout<Float>.stride * 6
-            
-        case .POSITION_FLOAT3_NORMAL_FLOAT3_TEXCOORD0_FLOAT2:
-            vertexDescriptor.attributes[0].format = .float3
-            vertexDescriptor.attributes[0].bufferIndex = 0
-            vertexDescriptor.attributes[0].offset = 0
-            
-            vertexDescriptor.attributes[1].format = .float3
-            vertexDescriptor.attributes[1].bufferIndex = 0
-            vertexDescriptor.attributes[1].offset = MemoryLayout<Float>.stride * 3
-            
-            vertexDescriptor.attributes[2].format = .float2
+            vertexDescriptor.attributes[2].format = .float4
             vertexDescriptor.attributes[2].bufferIndex = 0
             vertexDescriptor.attributes[2].offset = MemoryLayout<Float>.stride * 6
             
-            vertexDescriptor.layouts[0].stride = MemoryLayout<Float>.stride * 8
+            vertexDescriptor.layouts[0].stride = MemoryLayout<Float>.stride * 10
             
-        case .POSITION_FLOAT3_NORMAL_FLOAT3_TANGENT_FLOAT3_TEXCOORD0_FLOAT2:
+        case .POSITION_FLOAT3_NORMAL_FLOAT3_COLOR_FLOAT4_TEXCOORD0_FLOAT2:
             vertexDescriptor.attributes[0].format = .float3
             vertexDescriptor.attributes[0].bufferIndex = 0
             vertexDescriptor.attributes[0].offset = 0
@@ -157,15 +124,38 @@ class MetalRenderer: NSObject, MTKViewDelegate {
             vertexDescriptor.attributes[1].bufferIndex = 0
             vertexDescriptor.attributes[1].offset = MemoryLayout<Float>.stride * 3
             
-            vertexDescriptor.attributes[2].format = .float3
+            vertexDescriptor.attributes[2].format = .float4
             vertexDescriptor.attributes[2].bufferIndex = 0
             vertexDescriptor.attributes[2].offset = MemoryLayout<Float>.stride * 6
             
             vertexDescriptor.attributes[3].format = .float2
             vertexDescriptor.attributes[3].bufferIndex = 0
-            vertexDescriptor.attributes[3].offset = MemoryLayout<Float>.stride * 9
+            vertexDescriptor.attributes[3].offset = MemoryLayout<Float>.stride * 10
             
-            vertexDescriptor.layouts[0].stride = MemoryLayout<Float>.stride * 9
+            vertexDescriptor.layouts[0].stride = MemoryLayout<Float>.stride * 12
+            
+        case .POSITION_FLOAT3_NORMAL_FLOAT3_COLOR_FLOAT4_TANGENT_FLOAT3_TEXCOORD0_FLOAT2:
+            vertexDescriptor.attributes[0].format = .float3
+            vertexDescriptor.attributes[0].bufferIndex = 0
+            vertexDescriptor.attributes[0].offset = 0
+            
+            vertexDescriptor.attributes[1].format = .float3
+            vertexDescriptor.attributes[1].bufferIndex = 0
+            vertexDescriptor.attributes[1].offset = MemoryLayout<Float>.stride * 3
+            
+            vertexDescriptor.attributes[2].format = .float4
+            vertexDescriptor.attributes[2].bufferIndex = 0
+            vertexDescriptor.attributes[2].offset = MemoryLayout<Float>.stride * 6
+            
+            vertexDescriptor.attributes[3].format = .float3
+            vertexDescriptor.attributes[3].bufferIndex = 0
+            vertexDescriptor.attributes[3].offset = MemoryLayout<Float>.stride * 10
+            
+            vertexDescriptor.attributes[4].format = .float2
+            vertexDescriptor.attributes[4].bufferIndex = 0
+            vertexDescriptor.attributes[4].offset = MemoryLayout<Float>.stride * 13
+            
+            vertexDescriptor.layouts[0].stride = MemoryLayout<Float>.stride * 15
             
         default:
             fatalError("Unsupported vertex layout.")
@@ -185,21 +175,21 @@ class MetalRenderer: NSObject, MTKViewDelegate {
             var vertexFunction: MTLFunction
             
             switch iPrimitiveShape.m_vertexLayout {
-            case .POSITION_FLOAT3_NORMAL_FLOAT3:
+            case .POSITION_FLOAT3_NORMAL_FLOAT3_COLOR_FLOAT4:
                 if let tmpVertFunc = library.makeFunction(name: "vertex_main_POS_NRM") {
                     vertexFunction = tmpVertFunc
                 } else {
                     fatalError("Could not find vert func for POS_NRM.")
                 }
                 
-            case .POSITION_FLOAT3_NORMAL_FLOAT3_TEXCOORD0_FLOAT2:
+            case .POSITION_FLOAT3_NORMAL_FLOAT3_COLOR_FLOAT4_TEXCOORD0_FLOAT2:
                 if let tmpVertFunc = library.makeFunction(name: "vertex_main_POS_NRM_UV") {
                     vertexFunction = tmpVertFunc
                 } else {
                     fatalError("Could not find vert func for POS_NRM_UV.")
                 }
                 
-            case .POSITION_FLOAT3_NORMAL_FLOAT3_TANGENT_FLOAT3_TEXCOORD0_FLOAT2:
+            case .POSITION_FLOAT3_NORMAL_FLOAT3_COLOR_FLOAT4_TANGENT_FLOAT3_TEXCOORD0_FLOAT2:
                 if let tmpVertFunc = library.makeFunction(name: "vertex_main_POS_NRM_TAN_UV") {
                     vertexFunction = tmpVertFunc
                 } else {
@@ -236,7 +226,6 @@ class MetalRenderer: NSObject, MTKViewDelegate {
             let perspectiveMat = PerspectiveMatrix(perspectiveWithAspect: m_tempAspect, fovy: Float.pi/5, near: 0.1, far: 1000.0)
             let viewMat = m_sceneManager.m_activeCamera?.GetViewMatrix() ?? matrix_identity_float4x4
             let camPos: simd_float4 = simd_float4(m_sceneManager.m_activeCamera!.m_worldPos, 0.0)
-            // let camPos : simd_float4 = simd_float4(0.0, 0.0, 0.0, 0.0)
             
             /// Materials populating
             var baseColorFactor : simd_float4 = simd_float4(0.0, 0.0, 0.0, 1.0)
@@ -271,11 +260,6 @@ class MetalRenderer: NSObject, MTKViewDelegate {
             
             materialInfoMask.x = materialInfoMask_x
             
-            /*
-            var renderInfo : RenderInfoBuffer = RenderInfoBuffer(modelMatrix: m_tempTransformationMatrix,
-                                                                 vpMatrix: perspectiveMat,
-                                                                 camPos: camPos)
-            */
             var renderInfo : RenderInfoBuffer = RenderInfoBuffer(modelMatrix: iStaticModelNode.m_modelMatrix,
                                                                  vpMatrix: perspectiveMat,
                                                                  viewMatrix: viewMat,
@@ -306,7 +290,6 @@ class MetalRenderer: NSObject, MTKViewDelegate {
                                                length: MemoryLayout<RenderInfoBuffer>.stride,
                                                index: 2)
             
-            // if iPrimitiveShape.m_material!.m_baseColorTexture != nil
             iRenderCmdEncoder.setFragmentTexture(iPrimitiveShape.m_material!.m_baseColorTexture, index: 1)
             iRenderCmdEncoder.setFragmentSamplerState(iPrimitiveShape.m_material!.m_baseColorTexSampler, index: 1)
             
