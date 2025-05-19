@@ -151,7 +151,12 @@ class Camera : SceneNode {
     
     var m_worldPos: simd_float3 = simd_float3()
     var m_lookAt: simd_float3 = simd_float3()
+    
+    /// This position depends on scene. The first auto-gen camera position to get a good view.
+    var m_defaultWorldPos: simd_float3 = simd_float3(0.0, 0.0, -5.0)
+    
     let m_worldUp: simd_float3 = simd_float3(0.0, 1.0, 0.0)
+    
     
     func GetViewMatrix() -> simd_float4x4 {
         let viewNrm = normalize(m_lookAt - m_worldPos)
@@ -255,6 +260,10 @@ class SceneManager
                 for nodeIdx in 0..<assetRef.nodes.count {
                     // let meshRef = assetRef.meshes[meshIdx]
                     let nodeRef = assetRef.nodes[nodeIdx]
+                    
+                    if nodeRef.mesh == nil {
+                        continue
+                    }
                     
                     assert(nodeRef.mesh != nil, "Node Mesh cannot be nil!")
                     let meshRef = nodeRef.mesh!
@@ -388,6 +397,7 @@ class SceneManager
                 /// Post loading activities
                 m_activeCamera = Camera(iObjType: .Camera, iObjName: "MyCamera")
                 m_activeCamera!.m_worldPos = simd_float3(0.0, 0.0, -5.0)
+                m_activeCamera!.m_defaultWorldPos = simd_float3(0.0, 0.0, -5.0)
                 m_activeCamera!.m_lookAt = simd_float3(0.0, 0.0, 0.0)
                 m_sceneGraph.m_nodes.append(m_activeCamera!)
             }

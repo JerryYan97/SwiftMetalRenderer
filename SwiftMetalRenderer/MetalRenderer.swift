@@ -52,7 +52,6 @@ class MetalRenderer: NSObject, MTKViewDelegate {
         
         let sceneConfigFile = "DefaultScene.yaml"
         
-        
         let programPath = Bundle.main.bundlePath
         let exePath = Bundle.main.executablePath ?? ""
         let rsrcPath = Bundle.main.resourcePath ?? ""
@@ -374,9 +373,23 @@ class MetalRenderer: NSObject, MTKViewDelegate {
         }
     }
     
+    func updateCamera(verticalRotation: Float, horizontalRotation: Float, distance: Float) {
+        if m_sceneManager.m_activeCamera != nil {
+            /// Horizontal from positive-x to positive-z
+            let xVal = sin(horizontalRotation)
+            let zVal = -cos(horizontalRotation)
+            let yVal = sin(verticalRotation)
+            
+            let camDir : simd_float3 = normalize(simd_float3(xVal, yVal, zVal))
+            m_sceneManager.m_activeCamera!.m_worldPos = distance * camDir
+        }
+    }
+    
+    /*
     func updateRotation(angle: Float) {
         rotationMatrix = float4x4(rotationZ: angle)
     }
+     */
     
     private static func createDevice() -> MTLDevice {
         guard let defaultDevice = MTLCreateSystemDefaultDevice() else {

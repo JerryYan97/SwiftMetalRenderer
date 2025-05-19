@@ -177,12 +177,12 @@ fragment float4 fragment_main(FragmentInput input [[stage_in]],
         diffAlbedo = refAlbedo;
     }
     
-    float roughness = 0.2;
+    float roughness = 1.0;
     float metallic = 0.0;
     if((materialInfo.materialInfoMask.x & RENDER_INFO_MASK0_CNST_METALLIC_ROUGHNESS) > 0)
     {
-        roughness = 0.2;
-        metallic = 0.0;
+        roughness = materialInfo.pbrInfo[1];
+        metallic = materialInfo.pbrInfo[0];
     }
     else
     {
