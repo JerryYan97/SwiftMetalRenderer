@@ -385,12 +385,6 @@ class MetalRenderer: NSObject, MTKViewDelegate {
         }
     }
     
-    /*
-    func updateRotation(angle: Float) {
-        rotationMatrix = float4x4(rotationZ: angle)
-    }
-     */
-    
     private static func createDevice() -> MTLDevice {
         guard let defaultDevice = MTLCreateSystemDefaultDevice() else {
             fatalError("GPU not available")

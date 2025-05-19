@@ -33,3 +33,6 @@ Milestones:
 (4.1): Add UI control for object rotation, camera dist control, and limited camera vertical view rotation control.
 (4.3): Video of MacOS and IOS on Youtube.
 (4.4): Github and personal website gallay update.
+
+(4.x.1): Load different model
+(4.x.2): Add scenegraph tree to UI on MacOS.

@@ -473,10 +473,12 @@ class SceneManager
                 let b_raw : UInt8 = dataPtr![pixelIdx * 4 + 2]
                 let a_raw : UInt8 = dataPtr![pixelIdx * 4 + 3]
                 
-                pixelData.append(Float(r_raw) / 255.0)
-                pixelData.append(Float(g_raw) / 255.0)
-                pixelData.append(Float(b_raw) / 255.0)
-                pixelData.append(Float(a_raw) / 255.0)
+                var gammaFloatUsed : Float = 2.2
+                
+                pixelData.append(pow(Float(r_raw) / 255.0, gammaFloatUsed))
+                pixelData.append(pow(Float(g_raw) / 255.0, gammaFloatUsed))
+                pixelData.append(pow(Float(b_raw) / 255.0, gammaFloatUsed))
+                pixelData.append(pow(Float(a_raw) / 255.0, gammaFloatUsed))
             }
         }
         

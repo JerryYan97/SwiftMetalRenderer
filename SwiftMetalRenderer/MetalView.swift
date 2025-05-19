@@ -11,8 +11,11 @@ import SwiftUI
 let g_renderer = MetalRenderer()
 
 #if os(iOS)
+
 struct MetalView: UIViewRepresentable {
-    @Binding var rotation: Float
+    @Binding var camVerticalRotation: Float
+    @Binding var dist: Float
+    @Binding var camHorizontalRotation: Float
     
     func makeUIView(context: Context) -> some UIView {
         let view = MTKView()
@@ -26,9 +29,12 @@ struct MetalView: UIViewRepresentable {
     }
     
     func updateUIView(_ uiView: UIViewType, context: Context){
-        g_renderer.updateRotation(angle: rotation)
+        g_renderer.updateCamera(verticalRotation: camVerticalRotation,
+                                horizontalRotation: camHorizontalRotation,
+                                distance: dist)
     }
 }
+ 
 #elseif os(macOS)
 struct MetalView: NSViewRepresentable {
     // @State private var renderer: MetalRenderer = MetalRenderer()
