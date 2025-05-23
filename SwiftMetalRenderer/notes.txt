@@ -30,9 +30,9 @@ Milestones:
 
 
 (4): Github, Gallay, Resume, marketing camera clean up
-(4.1): Add UI control for object rotation, camera dist control, and limited camera vertical view rotation control.
+(4.1): Add UI control for object rotation, camera dist control, and limited camera vertical view rotation control. (Done)
 (4.3): Video of MacOS and IOS on Youtube.
 (4.4): Github and personal website gallay update.
 
-(4.x.1): Load different model
+(4.x.1): Load/Unload different model without changing the model in the default scene.
 (4.x.2): Add scenegraph tree to UI on MacOS.

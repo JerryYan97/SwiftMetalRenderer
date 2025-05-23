@@ -1,0 +1,8 @@
+fileName: AssetList
+Assets:
+    Box: Box.gltf
+    BoxTextured: BoxTextured.gltf
+    CompareBaseColor: CompareBaseColor/CompareBaseColor.gltf
+    CompareMetallic: CompareMetallic/CompareMetallic.gltf
+    CompareNormal: CompareNormal/CompareNormal.gltf
+    Fox: Fox/Fox.gltf

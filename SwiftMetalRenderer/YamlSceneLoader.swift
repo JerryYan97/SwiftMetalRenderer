@@ -467,7 +467,7 @@ class SceneManager
         // TODO: Need to have a more general data parser to consider color space, component types.
         for row in 0 ..< pixHeight {
             for column in 0 ..< pixWidth {
-                let pixelIdx = column * pixWidth + row
+                let pixelIdx = row * pixWidth + column
                 let r_raw : UInt8 = dataPtr![pixelIdx * 4]
                 let g_raw : UInt8 = dataPtr![pixelIdx * 4 + 1]
                 let b_raw : UInt8 = dataPtr![pixelIdx * 4 + 2]
