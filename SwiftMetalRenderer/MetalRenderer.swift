@@ -228,27 +228,22 @@ class MetalRenderer: NSObject, MTKViewDelegate {
             let camPos: simd_float4 = simd_float4(m_sceneManager.m_activeCamera!.m_worldPos, 0.0)
             
             /// Materials populating
-            var baseColorFactor : simd_float4 = simd_float4(0.0, 0.0, 0.0, 1.0)
+            let baseColorFactorFltArray = iPrimitiveShape.m_material!.m_baseColorFactor!
+            let baseColorFactor : simd_float4 = simd_float4(baseColorFactorFltArray[0],
+                                                            baseColorFactorFltArray[1],
+                                                            baseColorFactorFltArray[2],
+                                                            baseColorFactorFltArray[3])
+            
             var materialInfoMask_x : UInt32 = 0
-            if iPrimitiveShape.m_material!.m_baseColorFactor != nil {
-                let baseColorFactorFltArray = iPrimitiveShape.m_material!.m_baseColorFactor!
-                baseColorFactor = simd_float4(baseColorFactorFltArray[0],
-                                              baseColorFactorFltArray[1],
-                                              baseColorFactorFltArray[2],
-                                              baseColorFactorFltArray[3])
-                
+            if iPrimitiveShape.m_material!.m_baseColorTexture == nil {
                 materialInfoMask_x |= 0x01
             }
             
-            var pbrInfo : simd_float4 = simd_float4(0.0, 0.0, 0.0, 0.0)
+            let pbrInfo : simd_float4 = simd_float4(iPrimitiveShape.m_material!.m_metallicFactor!,
+                                                    iPrimitiveShape.m_material!.m_roughnessFactor!,
+                                                    0.0, 0.0)
             
-            if iPrimitiveShape.m_material!.m_metallicFactor != nil {
-                pbrInfo.x = iPrimitiveShape.m_material!.m_metallicFactor!
-                materialInfoMask_x |= 0x02
-            }
-            
-            if iPrimitiveShape.m_material!.m_roughnessFactor != nil {
-                pbrInfo.y = iPrimitiveShape.m_material!.m_roughnessFactor!
+            if iPrimitiveShape.m_material!.m_metallicRoughnessTexture == nil {
                 materialInfoMask_x |= 0x02
             }
             

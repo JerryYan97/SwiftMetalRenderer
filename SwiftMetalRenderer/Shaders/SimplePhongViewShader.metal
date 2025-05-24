@@ -162,7 +162,7 @@ fragment float4 fragment_main(FragmentInput input [[stage_in]],
     float3 normal(input.normal.xyz);
     normal = normalize(normal);
     
-    float3 ambientLight = float3(0.529, 0.81, 0.92) * 0.05;
+    float3 ambientLight = float3(0.529, 0.81, 0.92) * 10;
     
     float3 refAlbedo = input.color.xyz;
     float3 diffAlbedo = input.color.xyz;
@@ -174,7 +174,7 @@ fragment float4 fragment_main(FragmentInput input [[stage_in]],
     else
     {
         float2 transUV = TexTransUV(input.uv, materialInfo.texTransBaseColor);
-        refAlbedo *= albedoTex.sample(albedoSampler, transUV).xyz;
+        refAlbedo *= (albedoTex.sample(albedoSampler, transUV).xyz * materialInfo.baseColor.xyz);
         diffAlbedo = refAlbedo;
     }
     
@@ -189,8 +189,8 @@ fragment float4 fragment_main(FragmentInput input [[stage_in]],
     {
         float2 transUV = TexTransUV(input.uv, materialInfo.texTransMetallicRoughness);
         float3 roughnessMetalSample = roughnessMetallicTex.sample(roughnessMetallicSampler, transUV).xyz;
-        roughness = roughnessMetalSample.g;
-        metallic = roughnessMetalSample.b;
+        roughness = roughnessMetalSample.g * materialInfo.pbrInfo[1];
+        metallic = roughnessMetalSample.b * materialInfo.pbrInfo[0];
     }
     
     if((materialInfo.materialInfoMask.x & RENDER_INFO_MASK0_NORMAL_MAP) > 0)
@@ -225,9 +225,9 @@ fragment float4 fragment_main(FragmentInput input [[stage_in]],
 
     float3 Lo = float3(0.0, 0.0, 0.0); // Output light values to the view direction.
     uint lightCnt = 4;
-    float3 lightOneRad = float3(20.0, 20.0, 20.0);
+    float3 lightOneRad = float3(10.0, 10.0, 10.0);
     float3 lightRadiance[4] = { lightOneRad, lightOneRad, lightOneRad, lightOneRad };
-    float offset = 1.0;
+    float offset = 2.0;
     float3 lightPositions[4] = {
         renderInfo.camWorldPos.xyz + float3(offset, offset, 0.0),
         renderInfo.camWorldPos.xyz + float3(-offset, offset, 0.0),

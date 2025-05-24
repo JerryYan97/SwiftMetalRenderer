@@ -21,24 +21,39 @@ struct ContentView: View {
             Spacer()
             HStack {
                 Spacer()
-                Text("Vertical Rotation: \(m_camVerticalRotation)")
+#if os(macOS)
+                Text("Vertical Rotation: \(m_camVerticalRotation)").font(.body)
+#else
+                Text(String(format:"Vert. Rot.: %.2f", m_camVerticalRotation)).font(.system(size: 12))
+#endif
                 Slider(value: $m_camVerticalRotation, in: -0.785...0.785).frame(width: 200)
+                
+                
                 Spacer()
             }
             Spacer()
             HStack {
                 Spacer()
-                Text("Horizontal Rotation: \(m_camHorizontalRotation)")
+#if os(macOS)
+                Text("Horizontal Rotation: \(m_camHorizontalRotation)").font(.body)
+#else
+                Text(String(format:"Horiz. Rot.: %.2f", m_camHorizontalRotation)).font(.system(size: 12))
+#endif
                 Slider(value: $m_camHorizontalRotation, in: 0...6.28319).frame(width: 200)
                 Spacer()
             }
             Spacer()
             HStack {
                 Spacer()
-                Text("Distance: \(m_camDist)")
+#if os(macOS)
+                Text("Distance: \(m_camDist)").font(.body)
+#else
+                Text(String(format:"Dist: %.2f", m_camDist)).font(.system(size: 12))
+#endif
                 Slider(value: $m_camDist, in: 0...10).frame(width: 200)
                 Spacer()
             }
+            Spacer()
         }
         /*
         .onChange(of: rotation,

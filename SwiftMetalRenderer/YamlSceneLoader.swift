@@ -294,7 +294,7 @@ class SceneManager
                         assert(posAttribute != nil, "A primitive must have a POSITION attribute")
                         assert(posAttribute!.accessor.componentType == .float, "POSITION attribute must be float components")
                         assert(posAttribute!.accessor.dimension == .vector3, "POSITION attribute must be 3D vector")
-                        assert(prim.indices != nil, "A primitive must have an index buffer")
+                        assert(prim.indices != nil, "A primitive must have an index buffer (GLTF Supports non-indexed Geo)")
                         
                         /// Load Position
                         let pPosData = ReadOutAccessorData(iAccessor: posAttribute!.accessor)
@@ -347,15 +347,15 @@ class SceneManager
                                                                                          iVertSizeInBytes: VertSizeInByte(iVertLayout: vertLayout))
                         
                         /// Load Material
+                        var shapeMaterial : Material = Material()
                         let baseColorFactor = primMaterial.metallicRoughness!.baseColorFactor
                         let baseColorTex = primMaterial.metallicRoughness!.baseColorTexture
                         let normalMapTex = primMaterial.normalTexture
-                        let metallicFactor = primMaterial.metallicRoughness!.metallicFactor
-                        let roughnessFactor = primMaterial.metallicRoughness!.roughnessFactor
+                        shapeMaterial.m_metallicFactor = primMaterial.metallicRoughness!.metallicFactor
+                        shapeMaterial.m_roughnessFactor = primMaterial.metallicRoughness!.roughnessFactor
                         let metallicRoughnessTex = primMaterial.metallicRoughness!.metallicRoughnessTexture
                         let emissiveTex = primMaterial.emissive!.emissiveTexture
-                        
-                        var shapeMaterial : Material = Material()
+                        let occlusionTex = primMaterial.occlusionTexture
                         
                         let samplerDefaultDesc : MTLSamplerDescriptor = MTLSamplerDescriptor()
                         shapeMaterial.m_normalMapSampler = m_mtlDevice!.makeSamplerState(descriptor: samplerDefaultDesc)
@@ -363,44 +363,41 @@ class SceneManager
                         shapeMaterial.m_aoMapSampler = m_mtlDevice!.makeSamplerState(descriptor: samplerDefaultDesc)
                         
                         // NSImage
+                        let baseColorFactorArray : [Float] = [baseColorFactor.x,
+                                                              baseColorFactor.y,
+                                                              baseColorFactor.z,
+                                                              baseColorFactor.w]
                         if baseColorTex != nil{
-                            shapeMaterial.m_baseColorTexSampler = CreateSampler(gltfSampler: baseColorTex!.texture.sampler!)
+                            shapeMaterial.m_baseColorTexSampler = CreateSampler(gltfSampler: baseColorTex!.texture.sampler)
                             shapeMaterial.m_baseColorTexture = LoadImageToGPU(gltfTex: baseColorTex!)
                             shapeMaterial.m_baseColorTexTrans = LoadTexTrans(gltfTex: baseColorTex!)
+                            shapeMaterial.m_baseColorFactor = baseColorFactorArray
                         } else {
-                            let baseColorFactor : [Float] = [baseColorFactor.x,
-                                                             baseColorFactor.y,
-                                                             baseColorFactor.z,
-                                                             baseColorFactor.w]
-                            
-                            shapeMaterial.m_baseColorFactor = baseColorFactor
+                            shapeMaterial.m_baseColorFactor = baseColorFactorArray
                             shapeMaterial.m_baseColorTexSampler = m_mtlDevice!.makeSamplerState(descriptor: samplerDefaultDesc)
                         }
                         
                         if normalMapTex != nil{
-                            if normalMapTex!.texture.sampler != nil{
-                                shapeMaterial.m_normalMapSampler = CreateSampler(gltfSampler: normalMapTex!.texture.sampler!)
-                            }
-                            
-                            shapeMaterial.m_normalMapTexture = LoadImageToGPU(gltfTex: normalMapTex!)
+                            shapeMaterial.m_normalMapSampler = CreateSampler(gltfSampler: normalMapTex!.texture.sampler)
+                            shapeMaterial.m_normalMapTexture = LoadImageToGPU(gltfTex: normalMapTex!, bDisableGamma: true)
                             shapeMaterial.m_normalMapTexTrans = LoadTexTrans(gltfTex: normalMapTex!)
                         }
                         
                         if metallicRoughnessTex != nil{
-                            shapeMaterial.m_metallicRoughnessTexture = LoadImageToGPU(gltfTex: metallicRoughnessTex!)
-                            shapeMaterial.m_metallicRoughnessTexSampler = CreateSampler(gltfSampler: metallicRoughnessTex!.texture.sampler!)
+                            shapeMaterial.m_metallicRoughnessTexture = LoadImageToGPU(gltfTex: metallicRoughnessTex!, bDisableGamma: true)
+                            shapeMaterial.m_metallicRoughnessTexSampler = CreateSampler(gltfSampler: metallicRoughnessTex!.texture.sampler)
                             shapeMaterial.m_metallicRoughnessTexTrans = LoadTexTrans(gltfTex: metallicRoughnessTex!)
-                        } else {
-                            let metallicFactor : Float = primMaterial.metallicRoughness!.metallicFactor
-                            let roughnessFactor : Float = primMaterial.metallicRoughness!.roughnessFactor
-                            
-                            shapeMaterial.m_roughnessFactor = roughnessFactor
-                            shapeMaterial.m_metallicFactor = metallicFactor
+                        }
+                        
+                        if occlusionTex != nil{
+                            shapeMaterial.m_aoMapSampler = CreateSampler(gltfSampler: occlusionTex!.texture.sampler)
+                            shapeMaterial.m_aoMapTexture = LoadImageToGPU(gltfTex: occlusionTex!, bDisableGamma: true)
+                            shapeMaterial.m_aoMapTexTrans = LoadTexTrans(gltfTex: occlusionTex!)
                         }
                         
                         if emissiveTex != nil{
                             shapeMaterial.m_emissveTexture = LoadImageToGPU(gltfTex: emissiveTex!)
-                            shapeMaterial.m_emissveTexSampler = CreateSampler(gltfSampler: emissiveTex!.texture.sampler!)
+                            shapeMaterial.m_emissveTexSampler = CreateSampler(gltfSampler: emissiveTex!.texture.sampler)
                             shapeMaterial.m_emissveTexTrans = LoadTexTrans(gltfTex: emissiveTex!)
                         }
                         else
@@ -452,7 +449,7 @@ class SceneManager
         }
     }
     
-    private func LoadImageToGPU(gltfTex: GLTFTextureParams) -> MTLTexture {
+    private func LoadImageToGPU(gltfTex: GLTFTextureParams, bDisableGamma: Bool = false) -> MTLTexture {
         #if os(iOS)
         let tmpCiImage = CIImage(contentsOf: gltfTex.texture.source!.uri!)!
         
@@ -494,7 +491,10 @@ class SceneManager
                 let b_raw : UInt8 = dataPtr![pixelIdx * 4 + 2]
                 let a_raw : UInt8 = dataPtr![pixelIdx * 4 + 3]
                 
-                var gammaFloatUsed : Float = 2.2
+                var gammaFloatUsed : Float = 1.0
+                if bDisableGamma == false {
+                    gammaFloatUsed = 2.2
+                }
                 
                 pixelData.append(pow(Float(r_raw) / 255.0, gammaFloatUsed))
                 pixelData.append(pow(Float(g_raw) / 255.0, gammaFloatUsed))
@@ -518,11 +518,13 @@ class SceneManager
             for column in 0 ..< pixWidth {
                 let color_ij = rep.colorAt(x: column, y: row)!
                 
-                var gammaFloatUsed : Float = 2.2
-                if let gammaFloat = gamma as? Float {
-                    gammaFloatUsed = gammaFloat
+                var gammaFloatUsed : Float = 1.0
+                if bDisableGamma == false {
+                    gammaFloatUsed = 2.2
+                    if let gammaFloat = gamma as? Float {
+                        gammaFloatUsed = gammaFloat
+                    }
                 }
-                gammaFloatUsed = 1.0
                 
                 pixelData.append(pow(Float(color_ij.redComponent), gammaFloatUsed))
                 pixelData.append(pow(Float(color_ij.greenComponent), gammaFloatUsed))
@@ -545,41 +547,43 @@ class SceneManager
         return mtlTex!
     }
     
-    private func CreateSampler(gltfSampler: GLTFTextureSampler) -> MTLSamplerState
+    private func CreateSampler(gltfSampler: GLTFTextureSampler?) -> MTLSamplerState
     {
         var samplerDesc : MTLSamplerDescriptor = MTLSamplerDescriptor()
-        
-        switch gltfSampler.magFilter {
-        case .linear:
-            samplerDesc.magFilter = .linear
-            samplerDesc.minFilter = .linear
-        case .nearest:
-            samplerDesc.magFilter = .nearest
-            samplerDesc.minFilter = .nearest
-        @unknown default:
-            fatalError()
-        }
-        
-        switch gltfSampler.wrapS {
-            case .clampToEdge:
-                samplerDesc.sAddressMode = .clampToEdge
-            case .mirroredRepeat:
-                samplerDesc.sAddressMode = .mirrorRepeat
-            case .repeat:
-                samplerDesc.sAddressMode = .repeat
+        if gltfSampler != nil{
+            switch gltfSampler!.magFilter {
+            case .linear:
+                samplerDesc.magFilter = .linear
+                samplerDesc.minFilter = .linear
+            case .nearest:
+                samplerDesc.magFilter = .nearest
+                samplerDesc.minFilter = .nearest
             @unknown default:
-                fatalError()
-        }
-        
-        switch gltfSampler.wrapT {
-            case .clampToEdge:
-                samplerDesc.tAddressMode = .clampToEdge
-            case .mirroredRepeat:
-                samplerDesc.tAddressMode = .mirrorRepeat
-            case .repeat:
-                samplerDesc.tAddressMode = .repeat
-            @unknown default:
-                fatalError()
+                samplerDesc.magFilter = .linear
+                samplerDesc.minFilter = .linear
+            }
+            
+            switch gltfSampler!.wrapS {
+                case .clampToEdge:
+                    samplerDesc.sAddressMode = .clampToEdge
+                case .mirroredRepeat:
+                    samplerDesc.sAddressMode = .mirrorRepeat
+                case .repeat:
+                    samplerDesc.sAddressMode = .repeat
+                @unknown default:
+                    fatalError()
+            }
+            
+            switch gltfSampler!.wrapT {
+                case .clampToEdge:
+                    samplerDesc.tAddressMode = .clampToEdge
+                case .mirroredRepeat:
+                    samplerDesc.tAddressMode = .mirrorRepeat
+                case .repeat:
+                    samplerDesc.tAddressMode = .repeat
+                @unknown default:
+                    fatalError()
+            }
         }
         
         return m_mtlDevice!.makeSamplerState(descriptor: samplerDesc)!
