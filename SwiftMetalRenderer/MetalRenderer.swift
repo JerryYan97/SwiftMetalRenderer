@@ -205,6 +205,7 @@ class MetalRenderer: NSObject, MTKViewDelegate {
             pipelineDescriptor.vertexFunction = vertexFunction
             pipelineDescriptor.fragmentFunction = fragmentFunction
             pipelineDescriptor.vertexDescriptor = vertexDescriptor
+            
             let pipelineState = MetalRenderer.createPipelineState(iDevice: m_device, descriptor: pipelineDescriptor)
             ///
             
@@ -249,6 +250,14 @@ class MetalRenderer: NSObject, MTKViewDelegate {
             if iPrimitiveShape.m_material!.m_roughnessFactor != nil {
                 pbrInfo.y = iPrimitiveShape.m_material!.m_roughnessFactor!
                 materialInfoMask_x |= 0x02
+            }
+            
+            if iPrimitiveShape.m_material!.m_normalMapTexture != nil {
+                materialInfoMask_x |= 0x04
+            }
+            
+            if iPrimitiveShape.m_material!.m_aoMapTexture != nil {
+                materialInfoMask_x |= 0x08
             }
             
             if iPrimitiveShape.m_material!.m_emissveTexture != nil {

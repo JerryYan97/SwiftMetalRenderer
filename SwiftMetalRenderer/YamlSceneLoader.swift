@@ -285,6 +285,12 @@ class SceneManager
                         let uvAttribute = prim.attribute(forName: "TEXCOORD_0")
                         let colorAttribute = prim.attribute(forName: "COLOR_0")
                         
+                        /// Material Init information -- We need to put this ahead to facilitate custom tangent generation
+                        assert(prim.material != nil, "Cannot find the material.")
+                        assert(prim.material!.metallicRoughness != nil, "Cannot find the metallicRoughness.")
+                        let primMaterial = prim.material!
+                        ///
+                        
                         assert(posAttribute != nil, "A primitive must have a POSITION attribute")
                         assert(posAttribute!.accessor.componentType == .float, "POSITION attribute must be float components")
                         assert(posAttribute!.accessor.dimension == .vector3, "POSITION attribute must be 3D vector")
@@ -318,12 +324,21 @@ class SceneManager
                         
                         /// Construct the vertex buffer and index buffer
                         var primShape: PrimitiveShape = PrimitiveShape()
-                        let vertLayout = ChooseVertexBufferLayout(hasTangent: tanAttribute != nil,
-                                                                  hasTexCoord: uvAttribute != nil)
-                        primShape.m_vertexLayout = vertLayout
+                        
                         primShape.m_idxData = ReadOutAccessorData(iAccessor: prim.indices!)
                         primShape.m_idxType = IsIdxTypeUint32(iIdxAccessor: prim.indices!)
                         primShape.m_idxCnt = prim.indices!.count
+                        
+                        /// Generate custom tangent data if there is a normal map texture and we don't have native tangent data
+                        if tanAttribute == nil && primMaterial.normalTexture != nil{
+                            pTangentData = GenCustomTangentData(iUV: pUVData!, iPos: pPosData, iIdx: primShape.m_idxData!, idxCnt: primShape.m_idxCnt!)
+                        }
+                        
+                        let vertLayout = ChooseVertexBufferLayout(hasTangent: pTangentData != nil,
+                                                                  hasTexCoord: uvAttribute != nil)
+                        primShape.m_vertexLayout = vertLayout
+                        
+                        
                         (primShape.m_vertexData, primShape.m_bbx) = AssembleVertexBuffer(iPos: pPosData,
                                                                                          iNrm: pNormalData,
                                                                                          iTangent: pTangentData,
@@ -332,12 +347,9 @@ class SceneManager
                                                                                          iVertSizeInBytes: VertSizeInByte(iVertLayout: vertLayout))
                         
                         /// Load Material
-                        assert(prim.material != nil, "Cannot find the material.")
-                        assert(prim.material!.metallicRoughness != nil, "Cannot find the metallicRoughness.")
-                        
-                        let primMaterial = prim.material!
                         let baseColorFactor = primMaterial.metallicRoughness!.baseColorFactor
                         let baseColorTex = primMaterial.metallicRoughness!.baseColorTexture
+                        let normalMapTex = primMaterial.normalTexture
                         let metallicFactor = primMaterial.metallicRoughness!.metallicFactor
                         let roughnessFactor = primMaterial.metallicRoughness!.roughnessFactor
                         let metallicRoughnessTex = primMaterial.metallicRoughness!.metallicRoughnessTexture
@@ -363,6 +375,15 @@ class SceneManager
                             
                             shapeMaterial.m_baseColorFactor = baseColorFactor
                             shapeMaterial.m_baseColorTexSampler = m_mtlDevice!.makeSamplerState(descriptor: samplerDefaultDesc)
+                        }
+                        
+                        if normalMapTex != nil{
+                            if normalMapTex!.texture.sampler != nil{
+                                shapeMaterial.m_normalMapSampler = CreateSampler(gltfSampler: normalMapTex!.texture.sampler!)
+                            }
+                            
+                            shapeMaterial.m_normalMapTexture = LoadImageToGPU(gltfTex: normalMapTex!)
+                            shapeMaterial.m_normalMapTexTrans = LoadTexTrans(gltfTex: normalMapTex!)
                         }
                         
                         if metallicRoughnessTex != nil{
@@ -501,6 +522,7 @@ class SceneManager
                 if let gammaFloat = gamma as? Float {
                     gammaFloatUsed = gammaFloat
                 }
+                gammaFloatUsed = 1.0
                 
                 pixelData.append(pow(Float(color_ij.redComponent), gammaFloatUsed))
                 pixelData.append(pow(Float(color_ij.greenComponent), gammaFloatUsed))
@@ -526,8 +548,17 @@ class SceneManager
     private func CreateSampler(gltfSampler: GLTFTextureSampler) -> MTLSamplerState
     {
         var samplerDesc : MTLSamplerDescriptor = MTLSamplerDescriptor()
-        samplerDesc.minFilter = .linear
-        samplerDesc.magFilter = .linear
+        
+        switch gltfSampler.magFilter {
+        case .linear:
+            samplerDesc.magFilter = .linear
+            samplerDesc.minFilter = .linear
+        case .nearest:
+            samplerDesc.magFilter = .nearest
+            samplerDesc.minFilter = .nearest
+        @unknown default:
+            fatalError()
+        }
         
         switch gltfSampler.wrapS {
             case .clampToEdge:
@@ -714,6 +745,120 @@ class SceneManager
         } else {
             return .uint16
         }
+    }
+    
+    func GenCustomTangentData(iUV: UnsafeMutableRawBufferPointer,
+                              iPos: UnsafeMutableRawBufferPointer,
+                              iIdx: UnsafeMutableRawBufferPointer,
+                              idxCnt: Int) -> UnsafeMutableRawBufferPointer {
+        let vertCnt = iPos.count / (MemoryLayout<Float>.stride * 3)
+        let triCnt = idxCnt / 3
+        
+        let idxBytes : Int = iIdx.count / idxCnt
+        let dataBytesCnt = vertCnt * 3 * MemoryLayout<Float>.stride
+        var pTangentData = UnsafeMutableRawBufferPointer.allocate(byteCount: dataBytesCnt, alignment: 1024)
+        
+        for triIdx in 0..<triCnt{
+            var idx0 : Int = 0, idx1 : Int = 0, idx2 : Int = 0
+            let idxOffset = triIdx * 3
+            let pIdxSrc = iIdx.baseAddress?.advanced(by: idxOffset * idxBytes)
+            if idxBytes == 4 {
+                pIdxSrc?.withMemoryRebound(to: UInt32.self, capacity: 3, {(ptr: UnsafeMutablePointer<UInt32>) in
+                    idx0 = Int(ptr.advanced(by: 0).pointee)
+                    idx1 = Int(ptr.advanced(by: 1).pointee)
+                    idx2 = Int(ptr.advanced(by: 2).pointee)
+                })
+            } else if idxBytes == 2 {
+                pIdxSrc?.withMemoryRebound(to: UInt16.self, capacity: 3, {(ptr: UnsafeMutablePointer<UInt16>) in
+                    idx0 = Int(ptr.advanced(by: 0).pointee)
+                    idx1 = Int(ptr.advanced(by: 1).pointee)
+                    idx2 = Int(ptr.advanced(by: 2).pointee)
+                })
+            } else {
+                assert(false, "Invalid index Type.")
+            }
+            
+            /// Get Positions
+            var pos0 : SIMD3<Float> = SIMD3<Float>(0.0, 0.0, 0.0)
+            var pos1 : SIMD3<Float> = SIMD3<Float>(0.0, 0.0, 0.0)
+            var pos2 : SIMD3<Float> = SIMD3<Float>(0.0, 0.0, 0.0)
+            let pos0Data = iPos.baseAddress?.advanced(by: idx0 * 3 * MemoryLayout<Float>.stride)
+            let pos1Data = iPos.baseAddress?.advanced(by: idx1 * 3 * MemoryLayout<Float>.stride)
+            let pos2Data = iPos.baseAddress?.advanced(by: idx2 * 3 * MemoryLayout<Float>.stride)
+            pos0Data?.withMemoryRebound(to: Float.self, capacity: 3, {(ptr: UnsafeMutablePointer<Float>) in
+                pos0.x = ptr.advanced(by: 0).pointee
+                pos0.y = ptr.advanced(by: 1).pointee
+                pos0.z = ptr.advanced(by: 2).pointee
+            })
+            pos1Data?.withMemoryRebound(to: Float.self, capacity: 3, {(ptr: UnsafeMutablePointer<Float>) in
+                pos1.x = ptr.advanced(by: 0).pointee
+                pos1.y = ptr.advanced(by: 1).pointee
+                pos1.z = ptr.advanced(by: 2).pointee
+            })
+            pos2Data?.withMemoryRebound(to: Float.self, capacity: 3, {(ptr: UnsafeMutablePointer<Float>) in
+                pos2.x = ptr.advanced(by: 0).pointee
+                pos2.y = ptr.advanced(by: 1).pointee
+                pos2.z = ptr.advanced(by: 2).pointee
+            })
+            
+            /// Get UVs
+            var uv0 : SIMD2<Float> = SIMD2<Float>(0.0, 0.0)
+            var uv1 : SIMD2<Float> = SIMD2<Float>(0.0, 0.0)
+            var uv2 : SIMD2<Float> = SIMD2<Float>(0.0, 0.0)
+            let uv0Data = iUV.baseAddress?.advanced(by: idx0 * 2 * MemoryLayout<Float>.stride)
+            let uv1Data = iUV.baseAddress?.advanced(by: idx1 * 2 * MemoryLayout<Float>.stride)
+            let uv2Data = iUV.baseAddress?.advanced(by: idx2 * 2 * MemoryLayout<Float>.stride)
+            uv0Data?.withMemoryRebound(to: Float.self, capacity: 2, {(ptr: UnsafeMutablePointer<Float>) in
+                uv0.x = ptr.advanced(by: 0).pointee
+                uv0.y = ptr.advanced(by: 1).pointee
+            })
+            uv1Data?.withMemoryRebound(to: Float.self, capacity: 2, {(ptr: UnsafeMutablePointer<Float>) in
+                uv1.x = ptr.advanced(by: 0).pointee
+                uv1.y = ptr.advanced(by: 1).pointee
+            })
+            uv2Data?.withMemoryRebound(to: Float.self, capacity: 2, {(ptr: UnsafeMutablePointer<Float>) in
+                uv2.x = ptr.advanced(by: 0).pointee
+                uv2.y = ptr.advanced(by: 1).pointee
+            })
+            
+            let edge1 = pos1 - pos0
+            let edge2 = pos2 - pos0
+            let deltaUV1 = uv1 - uv0
+            let deltaUV2 = uv2 - uv0
+            
+            let f : Float = 1.0 / (deltaUV1.x * deltaUV2.y - deltaUV2.x * deltaUV1.y)
+            var tangent : SIMD3<Float> = SIMD3<Float>(0.0, 0.0, 0.0)
+            tangent.x = f * (deltaUV2.y * edge1.x - deltaUV1.y * edge2.x)
+            tangent.y = f * (deltaUV2.y * edge1.y - deltaUV1.y * edge2.y)
+            tangent.z = f * (deltaUV2.y * edge1.z - deltaUV1.y * edge2.z)
+            
+            tangent = normalize(tangent)
+            
+            /// Store tangent
+            let tangent0Data = pTangentData.baseAddress?.advanced(by: idx0 * 3 * MemoryLayout<Float>.stride)
+            let tangent1Data = pTangentData.baseAddress?.advanced(by: idx1 * 3 * MemoryLayout<Float>.stride)
+            let tangent2Data = pTangentData.baseAddress?.advanced(by: idx2 * 3 * MemoryLayout<Float>.stride)
+            
+            tangent0Data?.withMemoryRebound(to: Float.self, capacity: 3, {(ptr: UnsafeMutablePointer<Float>) in
+                ptr.advanced(by: 0).pointee = tangent.x
+                ptr.advanced(by: 1).pointee = tangent.y
+                ptr.advanced(by: 2).pointee = tangent.z
+            })
+            
+            tangent1Data?.withMemoryRebound(to: Float.self, capacity: 3, {(ptr: UnsafeMutablePointer<Float>) in
+                ptr.advanced(by: 0).pointee = tangent.x
+                ptr.advanced(by: 1).pointee = tangent.y
+                ptr.advanced(by: 2).pointee = tangent.z
+            })
+            
+            tangent2Data?.withMemoryRebound(to: Float.self, capacity: 3, {(ptr: UnsafeMutablePointer<Float>) in
+                ptr.advanced(by: 0).pointee = tangent.x
+                ptr.advanced(by: 1).pointee = tangent.y
+                ptr.advanced(by: 2).pointee = tangent.z
+            })
+        }
+        
+        return pTangentData
     }
     
     func ReadOutAccessorData(iAccessor: GLTFAccessor) -> UnsafeMutableRawBufferPointer{

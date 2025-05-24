@@ -110,6 +110,7 @@ vertex FragmentInput vertex_main_POS_NRM_TAN_UV(Vertex_POS_NRM_TAN_UV v [[stage_
         .vertPosition{v.position},
         .vertNormal{v.normal},
         .vertColor{v.color},
+        .vertUV{v.uv},
         .vertTangent{v.tangent},
         .renderInfo = renderInfo
     };
@@ -199,8 +200,9 @@ fragment float4 fragment_main(FragmentInput input [[stage_in]],
         float3 normalSampled = normalTex.sample(normalTexSampler, transUV).xyz;
         float3 tangent = normalize(input.tangent.xyz);
         float3 biTangent = normalize(cross(worldNormal, tangent));
-        normalSampled = normalSampled * 2.0 - 1.0;
-        normal = tangent * normalSampled.x + biTangent * normalSampled.y + worldNormal * normalSampled.z;
+        
+        normalSampled = normalize(normalSampled * 2.0 - 1.0);
+        normal = normalize(tangent * normalSampled.x + biTangent * normalSampled.y + worldNormal * normalSampled.z);
     }
     
     float aoFactor = 1.0;

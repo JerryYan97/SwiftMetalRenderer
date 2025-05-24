@@ -36,3 +36,4 @@ Milestones:
 
 (4.x.1): Load/Unload different model without changing the model in the default scene.
 (4.x.2): Add scenegraph tree to UI on MacOS.
+(4.x.3): Wrap Mikktsapce tangent generation.
