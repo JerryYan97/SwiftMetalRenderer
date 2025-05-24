@@ -4,7 +4,7 @@ sceneObjs:
     CubeModel:
         objName: cube1
         objType: StaticModel
-        modelPath: CompareAO/CompareAmbientOcclusion.gltf
+        modelPath: Duck.gltf
         gltfLoadType: model
     ActiveCamera:
         objName: cam1

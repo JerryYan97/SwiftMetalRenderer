@@ -76,10 +76,12 @@ class SceneNode
 {
     let m_objType: SceneObjectType?
     let m_objName: String?
+    let m_modelMat: simd_float4x4?
     
-    init(iObjType: SceneObjectType?, iObjName: String?){
+    init(iObjType: SceneObjectType?, iObjName: String?, iModelMat: simd_float4x4?){
         m_objType = iObjType
         m_objName = iObjName
+        m_modelMat = iModelMat
     }
 }
 
@@ -268,8 +270,21 @@ class SceneManager
                     assert(nodeRef.mesh != nil, "Node Mesh cannot be nil!")
                     let meshRef = nodeRef.mesh!
                     
-                    let staticModelNode: StaticModel = StaticModel(iObjType: Optional.none, iObjName: Optional.none)
-                    staticModelNode.m_modelMatrix = nodeRef.matrix
+                    let staticModelNode: StaticModel = StaticModel(iObjType: Optional.none, iObjName: Optional.none, iModelMat: nodeRef.matrix)
+                    
+                    /// Track up to get all transformation matrices
+                    var nodePtr : GLTFNode? = nodeRef
+                    // var matrix_stack: [simd_float4x4] = []
+                    var acc_matrix : simd_float4x4 = matrix_identity_float4x4
+                    while nodePtr != nil {
+                        // print("Matrix: ", nodePtr!.matrix)
+                        acc_matrix = simd_mul(nodePtr!.matrix, acc_matrix)
+                        nodePtr = nodePtr!.parent
+                    }
+                    
+                    staticModelNode.m_modelMatrix = acc_matrix
+                    ///
+                    
                     
                     // Currently only support a single mesh:
                     for primitiveIdx in 0..<meshRef.primitives.count {
@@ -413,7 +428,7 @@ class SceneManager
                 }
                 
                 /// Post loading activities
-                m_activeCamera = Camera(iObjType: .Camera, iObjName: "MyCamera")
+                m_activeCamera = Camera(iObjType: .Camera, iObjName: "MyCamera", iModelMat: nil)
                 m_activeCamera!.m_worldPos = simd_float3(0.0, 0.0, -5.0)
                 m_activeCamera!.m_defaultWorldPos = simd_float3(0.0, 0.0, -5.0)
                 m_activeCamera!.m_lookAt = simd_float3(0.0, 0.0, 0.0)
