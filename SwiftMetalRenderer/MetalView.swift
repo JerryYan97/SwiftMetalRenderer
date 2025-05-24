@@ -16,6 +16,8 @@ struct MetalView: UIViewRepresentable {
     @Binding var camVerticalRotation: Float
     @Binding var dist: Float
     @Binding var camHorizontalRotation: Float
+    @Binding var ptLightIntensity: Float
+    @Binding var ambientLightIntensity: Float
     
     func makeUIView(context: Context) -> some UIView {
         let view = MTKView()
@@ -32,6 +34,9 @@ struct MetalView: UIViewRepresentable {
         g_renderer.updateCamera(verticalRotation: camVerticalRotation,
                                 horizontalRotation: camHorizontalRotation,
                                 distance: dist)
+        
+        g_renderer.updateLights(ptLightIntensity: ptLightIntensity,
+                                ambientLightIntensity: ambientLightIntensity)
     }
 }
  
@@ -42,7 +47,8 @@ struct MetalView: NSViewRepresentable {
     @Binding var camVerticalRotation: Float
     @Binding var dist: Float
     @Binding var camHorizontalRotation: Float
-    
+    @Binding var ptLightIntensity: Float
+    @Binding var ambientLightIntensity: Float
     
     func makeNSView(context: Context) -> some NSView {
         let view = MTKView()
@@ -56,10 +62,12 @@ struct MetalView: NSViewRepresentable {
     }
     
     func updateNSView(_ nsView: NSViewType, context: Context){
-        // g_renderer.updateRotation(angle: rotation)
         g_renderer.updateCamera(verticalRotation: camVerticalRotation,
                                 horizontalRotation: camHorizontalRotation,
                                 distance: dist)
+        
+        g_renderer.updateLights(ptLightIntensity: ptLightIntensity,
+                                ambientLightIntensity: ambientLightIntensity)
     }
 }
 #endif

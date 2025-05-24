@@ -44,6 +44,7 @@ struct RenderInfoBuffer
     float4x4 perspectiveMatrix;
     float4x4 viewMatrix;
     float4 camWorldPos;
+    float4 lightsInfoFLT; // [0]: pt light intensity. [1]: Ambient light intensity.
 };
 
 struct MaterialInfoBuffer
@@ -162,7 +163,8 @@ fragment float4 fragment_main(FragmentInput input [[stage_in]],
     float3 normal(input.normal.xyz);
     normal = normalize(normal);
     
-    float3 ambientLight = float3(0.529, 0.81, 0.92) * 10;
+    float ambientLightIntensity = renderInfo.lightsInfoFLT[1];
+    float3 ambientLight = float3(0.529, 0.81, 0.92) * ambientLightIntensity;
     
     float3 refAlbedo = input.color.xyz;
     float3 diffAlbedo = input.color.xyz;
@@ -225,7 +227,8 @@ fragment float4 fragment_main(FragmentInput input [[stage_in]],
 
     float3 Lo = float3(0.0, 0.0, 0.0); // Output light values to the view direction.
     uint lightCnt = 4;
-    float3 lightOneRad = float3(10.0, 10.0, 10.0);
+    float ptLightIntensity = renderInfo.lightsInfoFLT[0];
+    float3 lightOneRad = float3(ptLightIntensity, ptLightIntensity, ptLightIntensity);
     float3 lightRadiance[4] = { lightOneRad, lightOneRad, lightOneRad, lightOneRad };
     float offset = 2.0;
     float3 lightPositions[4] = {

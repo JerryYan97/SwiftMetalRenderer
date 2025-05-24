@@ -15,6 +15,7 @@ struct RenderInfoBuffer
     let vpMatrix    : simd_float4x4
     let viewMatrix  : simd_float4x4
     let camPos      : simd_float4
+    let lightInfoFLT: simd_float4
 }
 
 struct MaterialInfoBuffer
@@ -41,7 +42,8 @@ class MetalRenderer: NSObject, MTKViewDelegate {
     private var m_tempTransformationMatrix = matrix_identity_float4x4
     private var m_tempAspect : Float = 0.0
     private var m_depthTexture : MTLTexture?
-    
+    private var m_ptLightIntensity: Float = 10.0
+    private var m_ambientLightIntensity: Float = 0.2
     
     
     override init(){
@@ -266,7 +268,8 @@ class MetalRenderer: NSObject, MTKViewDelegate {
             var renderInfo : RenderInfoBuffer = RenderInfoBuffer(modelMatrix: iStaticModelNode.m_modelMatrix,
                                                                  vpMatrix: perspectiveMat,
                                                                  viewMatrix: viewMat,
-                                                                 camPos: camPos)
+                                                                 camPos: camPos,
+                                                                 lightInfoFLT: simd_float4(m_ptLightIntensity, m_ambientLightIntensity, 0, 0))
             
             var materialInfo : MaterialInfoBuffer = MaterialInfoBuffer(materialInfoMask: materialInfoMask,
                                                                        baseColorFactor: baseColorFactor,
@@ -387,6 +390,11 @@ class MetalRenderer: NSObject, MTKViewDelegate {
             let camDir : simd_float3 = normalize(simd_float3(xVal, yVal, zVal))
             m_sceneManager.m_activeCamera!.m_worldPos = distance * camDir
         }
+    }
+    
+    func updateLights(ptLightIntensity: Float, ambientLightIntensity: Float){
+        m_ptLightIntensity = ptLightIntensity
+        m_ambientLightIntensity = ambientLightIntensity
     }
     
     private static func createDevice() -> MTLDevice {
