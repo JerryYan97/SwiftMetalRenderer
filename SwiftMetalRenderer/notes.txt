@@ -34,7 +34,7 @@ Milestones:
 (4.3): Video of MacOS and IOS on Youtube.
 (4.4): Github and personal website gallay update.
 List: CompareNormal, CompareMetallic, Duck, AmbientOcclusion, CompareBaseColor
-Need Feature: Ambient Light and point light intensity control.
+Need Feature: Ambient Light and point light intensity control. (Done)
 
 (4.x.1): Load/Unload different model without changing the model in the default scene.
 (4.x.2): Add scenegraph tree to UI on MacOS.

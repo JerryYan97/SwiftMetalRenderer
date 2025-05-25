@@ -41,10 +41,13 @@ class MetalRenderer: NSObject, MTKViewDelegate {
     private var rotationMatrix = matrix_identity_float4x4
     private var m_tempTransformationMatrix = matrix_identity_float4x4
     private var m_tempAspect : Float = 0.0
+    private var m_msDepthTex : MTLTexture?
     private var m_depthTexture : MTLTexture?
+    private var m_msColorRenderTargetTex : MTLTexture? // May need MSAA so the target needs to have multi-samples per fragment.
     private var m_ptLightIntensity: Float = 10.0
     private var m_ambientLightIntensity: Float = 0.2
-    
+    private var m_supportTileBasedRendering: Bool = false
+    private var m_msaaSampleCount: Int = 0
     
     override init(){
         m_device = MetalRenderer.createDevice()
@@ -68,6 +71,24 @@ class MetalRenderer: NSObject, MTKViewDelegate {
             }
         }catch{
             print("Error Checking File System")
+        }
+        
+        /// Check MSAA support
+        let sampleCounts: [Int] = [1, 2, 4, 8, 16, 32]
+        var sampleSupported: [Bool] = []
+        for cnt in sampleCounts {
+            let bSupport = m_device.supportsTextureSampleCount(cnt)
+            if bSupport {
+                m_msaaSampleCount = cnt
+            }
+            sampleSupported.append(bSupport)
+            print("Sample Cnt \(cnt) : \(bSupport)")
+        }
+        ///
+        
+        m_supportTileBasedRendering = m_device.supportsFamily(MTLGPUFamily.apple4)
+        if m_supportTileBasedRendering == false {
+            m_msaaSampleCount = 1
         }
         
         m_sceneManager.LoadYamlScene(iDevice: m_device, iSceneFilePath: sceneConfigFile)
@@ -208,6 +229,12 @@ class MetalRenderer: NSObject, MTKViewDelegate {
             pipelineDescriptor.fragmentFunction = fragmentFunction
             pipelineDescriptor.vertexDescriptor = vertexDescriptor
             
+            /// Enable pipeline's MSAA
+            if m_msaaSampleCount > 1 {
+                // pipelineDescriptor.colorAttachments[0].
+                pipelineDescriptor.rasterSampleCount = m_msaaSampleCount
+            }
+            
             let pipelineState = MetalRenderer.createPipelineState(iDevice: m_device, descriptor: pipelineDescriptor)
             ///
             
@@ -323,11 +350,40 @@ class MetalRenderer: NSObject, MTKViewDelegate {
         var depthTexDescriptor = MTLTextureDescriptor.texture2DDescriptor(
             pixelFormat: .depth32Float, width: width, height: height, mipmapped: false
         )
+        
         depthTexDescriptor.usage = .renderTarget
         depthTexDescriptor.storageMode = .private
         
         m_depthTexture = m_device.makeTexture(descriptor: depthTexDescriptor)
         m_depthTexture?.label = "Depth Render Target"
+        
+        if m_supportTileBasedRendering && m_msaaSampleCount > 1 {
+            depthTexDescriptor.textureType = .type2DMultisample
+            depthTexDescriptor.sampleCount = m_msaaSampleCount
+            depthTexDescriptor.storageMode = .memoryless
+            m_msDepthTex = m_device.makeTexture(descriptor: depthTexDescriptor)
+            m_msDepthTex?.label = "MS Depth Render Target"
+        }
+    }
+    
+    private func CreateMutisampleColorRenderTarget(_ width: Int, _ height: Int) {
+        if m_msaaSampleCount > 1 {
+            var multisampleColorRTDescriptor = MTLTextureDescriptor.texture2DDescriptor(
+                pixelFormat: .bgra8Unorm, width: width, height: height, mipmapped: false
+            )
+            multisampleColorRTDescriptor.textureType = .type2DMultisample
+            multisampleColorRTDescriptor.sampleCount = m_msaaSampleCount
+            
+            assert(m_supportTileBasedRendering, "TODO: Need to support IMR MSAA, but not yet.")
+            
+            if m_supportTileBasedRendering {
+                multisampleColorRTDescriptor.usage = .renderTarget
+                multisampleColorRTDescriptor.storageMode = .memoryless
+            }
+            
+            m_msColorRenderTargetTex = m_device.makeTexture(descriptor: multisampleColorRTDescriptor)
+            m_msColorRenderTargetTex?.label = "Multisample Color Render Target"
+        }
     }
     
     func draw(in view: MTKView) {
@@ -338,19 +394,38 @@ class MetalRenderer: NSObject, MTKViewDelegate {
                 /// Resize depth texture if it's needed or the first time
                 if m_depthTexture == nil {
                     CreateDepthFunc(drawable.texture.width, drawable.texture.height)
+                    CreateMutisampleColorRenderTarget(drawable.texture.width, drawable.texture.height)
                 } else if m_depthTexture!.width != drawable.texture.width ||
                           m_depthTexture!.height != drawable.texture.height {
                     CreateDepthFunc(drawable.texture.width, drawable.texture.height)
+                    CreateMutisampleColorRenderTarget(drawable.texture.width, drawable.texture.height)
                 }
                 
                 /// Update shapes' model matrices (We will directly use 'setVertexBytes' to upload uniform buffers)
                 renderPassDescriptor.colorAttachments[0].loadAction = .clear
                 renderPassDescriptor.colorAttachments[0].storeAction = .store
                 renderPassDescriptor.colorAttachments[0].clearColor = MTLClearColor(red: 0.529, green: 0.81, blue: 0.92, alpha: 1.0)
+                
                 renderPassDescriptor.depthAttachment.texture = m_depthTexture
                 renderPassDescriptor.depthAttachment.clearDepth = 1.0
                 renderPassDescriptor.depthAttachment.loadAction = .clear
                 renderPassDescriptor.depthAttachment.storeAction = .dontCare
+                
+                /// MSAA
+                if m_msaaSampleCount > 1 {
+                    renderPassDescriptor.colorAttachments[0].storeAction = .multisampleResolve
+                    renderPassDescriptor.colorAttachments[0].resolveTexture = drawable.texture
+                    renderPassDescriptor.colorAttachments[0].texture = m_msColorRenderTargetTex
+                    
+                    renderPassDescriptor.depthAttachment.storeAction = .multisampleResolve
+                    renderPassDescriptor.depthAttachment.texture = m_msDepthTex
+                    renderPassDescriptor.depthAttachment.resolveTexture = m_depthTexture
+                    
+                    renderPassDescriptor.tileWidth = 16
+                    renderPassDescriptor.tileHeight = 16
+                    renderPassDescriptor.imageblockSampleLength = 32
+                }
+                ///
                 
                 m_tempAspect = Float(drawable.texture.width) / Float(drawable.texture.height)
                 
