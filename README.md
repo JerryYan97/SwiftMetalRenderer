@@ -4,8 +4,7 @@ This is a Apple Metal practice project written in Swift. It uses custom YAML to 
 ![Cover Page](./img/SwiftMetalRenderer.png)
 
 
-![macOS](./img/macOS.png)
-![iOS](./img/iOS.jpg)
+![macOS](./img/macOS_iOS_Combine.png)
 
 ## Current Features
 * GLTF PBR, Ambient Occlusion, Normal Map
