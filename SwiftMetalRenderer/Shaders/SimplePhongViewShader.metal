@@ -195,6 +195,10 @@ fragment float4 fragment_main(FragmentInput input [[stage_in]],
         metallic = roughnessMetalSample.b * materialInfo.pbrInfo[0];
     }
     
+    /// Make sure roughness is not too low, which will cause point light reflection issue.
+    roughness = max(roughness, 0.05);
+    ///
+    
     if((materialInfo.materialInfoMask.x & RENDER_INFO_MASK0_NORMAL_MAP) > 0)
     {
         float3 worldNormal = normal;

@@ -18,7 +18,7 @@ Milestones:
 -- NSImage on MAC (AppKit) and UIImage on IOS (UIKit)
 
 
-(3): PBR related - default point lights scene
+(3): PBR related - default point lights scene (Done)
 (3.1): Port Shaders (Done)
 (3.2): Default 4 lights setup -- Use PBR balls to check port results.
 (3.3): Make sure iphone also works.
@@ -26,7 +26,7 @@ Milestones:
 (3.4.1): Support vert color. (Done)
 
 (3.x.1): Proper Camera Model. (Done)
-(3.x.2): Advanced feature: MSAA research.
+(3.x.2): Advanced feature: MSAA research. (Done)
 
 
 (4): Github, Gallay, Resume, marketing camera clean up
